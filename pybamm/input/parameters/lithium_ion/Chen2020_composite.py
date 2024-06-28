@@ -1,6 +1,5 @@
 import pybamm
 import os
-import numpy as np
 
 
 def graphite_LGM50_electrolyte_exchange_current_density_Chen2020(
@@ -35,9 +34,11 @@ def graphite_LGM50_electrolyte_exchange_current_density_Chen2020(
     """
     m_ref = 6.48e-7  # (A/m2)(m3/mol)**1.5 - includes ref concentrations
     E_r = 35000
-    arrhenius = np.exp(E_r / pybamm.constants.R * (1 / 298.15 - 1 / T))
+    arrhenius = pybamm.exp(E_r / pybamm.constants.R * (1 / 298.15 - 1 / T))
 
-    return m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    return (
+        m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    )
 
 
 def silicon_ocp_lithiation_Mark2016(sto):
@@ -163,9 +164,11 @@ def silicon_LGM50_electrolyte_exchange_current_density_Chen2020(
         6.48e-7 * 28700 / 278000
     )  # (A/m2)(m3/mol)**1.5 - includes ref concentrations
     E_r = 35000
-    arrhenius = np.exp(E_r / pybamm.constants.R * (1 / 298.15 - 1 / T))
+    arrhenius = pybamm.exp(E_r / pybamm.constants.R * (1 / 298.15 - 1 / T))
 
-    return m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    return (
+        m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    )
 
 
 def nmc_LGM50_ocp_Chen2020(sto):
@@ -194,9 +197,9 @@ def nmc_LGM50_ocp_Chen2020(sto):
     u_eq = (
         -0.8090 * sto
         + 4.4875
-        - 0.0428 * np.tanh(18.5138 * (sto - 0.5542))
-        - 17.7326 * np.tanh(15.7890 * (sto - 0.3117))
-        + 17.5842 * np.tanh(15.9308 * (sto - 0.3120))
+        - 0.0428 * pybamm.tanh(18.5138 * (sto - 0.5542))
+        - 17.7326 * pybamm.tanh(15.7890 * (sto - 0.3117))
+        + 17.5842 * pybamm.tanh(15.9308 * (sto - 0.3120))
     )
 
     return u_eq
@@ -232,9 +235,11 @@ def nmc_LGM50_electrolyte_exchange_current_density_Chen2020(c_e, c_s_surf, c_s_m
     """
     m_ref = 3.42e-6  # (A/m2)(m3/mol)**1.5 - includes ref concentrations
     E_r = 17800
-    arrhenius = np.exp(E_r / pybamm.constants.R * (1 / 298.15 - 1 / T))
+    arrhenius = pybamm.exp(E_r / pybamm.constants.R * (1 / 298.15 - 1 / T))
 
-    return m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    return (
+        m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    )
 
 
 def electrolyte_diffusivity_Nyman2008(c_e, T):
@@ -317,29 +322,39 @@ def graphite_ocp_Enertech_Ai2020(sto):
 def get_parameter_values():
     """
     Parameters for a composite graphite/silicon negative electrode, from the paper
-    :footcite:t:`Ai2022`, based on the paper :footcite:t:`Chen2020`, and references
-    therein.
+
+        Weilong Ai, Niall Kirkaldy, Yang Jiang, Gregory Offer, Huizhi Wang, and Billy
+        Wu. A composite electrode model for lithium-ion batteries with silicon/graphite
+        negative electrodes. Journal of Power Sources, 527:231142, 2022. URL:
+        https://www.sciencedirect.com/science/article/pii/S0378775322001604,
+        doi:https://doi.org/10.1016/j.jpowsour.2022.231142.
+
+    based on the paper
+
+        Chang-Hui Chen, Ferran Brosa Planella, Kieran O'Regan, Dominika Gastol, W.
+        Dhammika Widanage, and Emma Kendrick. Development of Experimental Techniques for
+        Parameterization of Multi-scale Lithium-ion Battery Models. Journal of The
+        Electrochemical Society, 167(8):080534, 2020. doi:10.1149/1945-7111/ab9050.
+
+    and references therein.
 
     SEI parameters are example parameters for composite SEI on silicon/graphite. Both
-    phases use the same values, from the paper :footcite:t:`Yang2017`
+    phases use the same values, from the paper.
+
+        Xiao Guang Yang, Yongjun Leng, Guangsheng Zhang, Shanhai Ge, and Chao Yang Wang.
+        Modeling of lithium plating induced aging of lithium-ion batteries: transition
+        from linear to nonlinear aging. Journal of Power Sources, 360:28–40, 2017.
+        doi:10.1016/j.jpowsour.2017.05.110.
+
     """
 
     return {
         "chemistry": "lithium_ion",
         # sei
         "Primary: Ratio of lithium moles to SEI moles": 2.0,
-        "Primary: Inner SEI reaction proportion": 0.5,
         "Primary: Inner SEI partial molar volume [m3.mol-1]": 9.585e-05,
         "Primary: Outer SEI partial molar volume [m3.mol-1]": 9.585e-05,
-        "Primary: SEI reaction exchange current density [A.m-2]": 1.5e-07,
         "Primary: SEI resistivity [Ohm.m]": 200000.0,
-        "Primary: Outer SEI solvent diffusivity [m2.s-1]": 2.5000000000000002e-22,
-        "Primary: Bulk solvent concentration [mol.m-3]": 2636.0,
-        "Primary: Inner SEI open-circuit potential [V]": 0.1,
-        "Primary: Outer SEI open-circuit potential [V]": 0.8,
-        "Primary: Inner SEI electron conductivity [S.m-1]": 8.95e-14,
-        "Primary: Inner SEI lithium interstitial diffusivity [m2.s-1]": 1e-20,
-        "Primary: Lithium interstitial reference concentration [mol.m-3]": 15.0,
         "Primary: Initial inner SEI thickness [m]": 2.5e-09,
         "Primary: Initial outer SEI thickness [m]": 2.5e-09,
         "Primary: EC initial concentration in electrolyte [mol.m-3]": 4541.0,
@@ -348,18 +363,9 @@ def get_parameter_values():
         "Primary: SEI open-circuit potential [V]": 0.4,
         "Primary: SEI growth activation energy [J.mol-1]": 0.0,
         "Secondary: Ratio of lithium moles to SEI moles": 2.0,
-        "Secondary: Inner SEI reaction proportion": 0.5,
         "Secondary: Inner SEI partial molar volume [m3.mol-1]": 9.585e-05,
         "Secondary: Outer SEI partial molar volume [m3.mol-1]": 9.585e-05,
-        "Secondary: SEI reaction exchange current density [A.m-2]": 1.5e-07,
         "Secondary: SEI resistivity [Ohm.m]": 200000.0,
-        "Secondary: Outer SEI solvent diffusivity [m2.s-1]": 2.5000000000000002e-22,
-        "Secondary: Bulk solvent concentration [mol.m-3]": 2636.0,
-        "Secondary: Inner SEI open-circuit potential [V]": 0.1,
-        "Secondary: Outer SEI open-circuit potential [V]": 0.8,
-        "Secondary: Inner SEI electron conductivity [S.m-1]": 8.95e-14,
-        "Secondary: Inner SEI lithium interstitial diffusivity [m2.s-1]": 1e-20,
-        "Secondary: Lithium interstitial reference concentration [mol.m-3]": 15.0,
         "Secondary: Initial inner SEI thickness [m]": 2.5e-09,
         "Secondary: Initial outer SEI thickness [m]": 2.5e-09,
         "Secondary: EC initial concentration in electrolyte [mol.m-3]": 4541.0,
@@ -367,7 +373,6 @@ def get_parameter_values():
         "Secondary: SEI kinetic rate constant [m.s-1]": 1e-12,
         "Secondary: SEI open-circuit potential [V]": 0.4,
         "Secondary: SEI growth activation energy [J.mol-1]": 0.0,
-        "Positive electrode reaction-driven LAM factor [m3.mol-1]": 0.0,
         # cell
         "Negative current collector thickness [m]": 1.2e-05,
         "Negative electrode thickness [m]": 8.52e-05,
@@ -394,7 +399,7 @@ def get_parameter_values():
         "Negative electrode conductivity [S.m-1]": 215.0,
         "Primary: Maximum concentration in negative electrode [mol.m-3]": 28700.0,
         "Primary: Initial concentration in negative electrode [mol.m-3]": 27700.0,
-        "Primary: Negative particle diffusivity [m2.s-1]": 5.5e-14,
+        "Primary: Negative electrode diffusivity [m2.s-1]": 5.5e-14,
         "Primary: Negative electrode OCP [V]": graphite_ocp_Enertech_Ai2020,
         "Negative electrode porosity": 0.25,
         "Primary: Negative electrode active material volume fraction": 0.735,
@@ -411,7 +416,7 @@ def get_parameter_values():
         "Primary: Negative electrode OCP entropic change [V.K-1]": 0.0,
         "Secondary: Maximum concentration in negative electrode [mol.m-3]": 278000.0,
         "Secondary: Initial concentration in negative electrode [mol.m-3]": 276610.0,
-        "Secondary: Negative particle diffusivity [m2.s-1]": 1.67e-14,
+        "Secondary: Negative electrode diffusivity [m2.s-1]": 1.67e-14,
         "Secondary: Negative electrode lithiation OCP [V]"
         "": silicon_ocp_lithiation_Mark2016,
         "Secondary: Negative electrode delithiation OCP [V]"
@@ -425,7 +430,7 @@ def get_parameter_values():
         # positive electrode
         "Positive electrode conductivity [S.m-1]": 0.18,
         "Maximum concentration in positive electrode [mol.m-3]": 63104.0,
-        "Positive particle diffusivity [m2.s-1]": 4e-15,
+        "Positive electrode diffusivity [m2.s-1]": 4e-15,
         "Positive electrode OCP [V]": nmc_LGM50_ocp_Chen2020,
         "Positive electrode porosity": 0.335,
         "Positive electrode active material volume fraction": 0.665,
@@ -460,8 +465,6 @@ def get_parameter_values():
         "Number of cells connected in series to make a battery": 1.0,
         "Lower voltage cut-off [V]": 2.5,
         "Upper voltage cut-off [V]": 4.2,
-        "Open-circuit voltage at 0% SOC [V]": 2.5,
-        "Open-circuit voltage at 100% SOC [V]": 4.2,
         "Initial concentration in negative electrode [mol.m-3]": 29866.0,
         "Initial concentration in positive electrode [mol.m-3]": 17038.0,
         "Initial temperature [K]": 298.15,

@@ -7,16 +7,21 @@ from .base_lithium_ion_model import BaseModel
 
 class DFN(BaseModel):
     """
-    Doyle-Fuller-Newman (DFN) model of a lithium-ion battery, from
-    :footcite:t:`Marquis2019`. See :class:`pybamm.lithium_ion.BaseModel` for more
-    details.
+    Doyle-Fuller-Newman (DFN) model of a lithium-ion battery, from [1]_.
+    See :class:`pybamm.lithium_ion.BaseModel` for more details.
 
     Examples
     --------
+    >>> import pybamm
     >>> model = pybamm.lithium_ion.DFN()
     >>> model.name
     'Doyle-Fuller-Newman model'
 
+    References
+    ----------
+    .. [1] SG Marquis, V Sulzer, R Timms, CP Please and SJ Chapman. “An asymptotic
+           derivation of a single particle model with electrolyte”. Journal of The
+           Electrochemical Society, 166(15):A3693–A3706, 2019
     """
 
     def __init__(self, options=None, name="Doyle-Fuller-Newman model", build=True):
@@ -41,10 +46,10 @@ class DFN(BaseModel):
                     self.submodels[f"{domain} {phase} interface"] = submod
 
                 if len(phases) > 1:
-                    self.submodels[f"total {domain} interface"] = (
-                        pybamm.kinetics.TotalMainKinetics(
-                            self.param, domain, "lithium-ion main", self.options
-                        )
+                    self.submodels[
+                        f"total {domain} interface"
+                    ] = pybamm.kinetics.TotalMainKinetics(
+                        self.param, domain, "lithium-ion main", self.options
                     )
 
     def set_particle_submodel(self):
@@ -65,26 +70,11 @@ class DFN(BaseModel):
                     submod = pybamm.particle.PolynomialProfile(
                         self.param, domain, self.options, phase=phase
                     )
-                elif particle == "MSMR":
-                    submod = pybamm.particle.MSMRDiffusion(
-                        self.param, domain, self.options, phase=phase, x_average=False
-                    )
-                    # also set the submodel for calculating stoichiometry from
-                    # potential
-                    self.submodels[f"{domain} {phase} stoichiometry"] = (
-                        pybamm.particle.MSMRStoichiometryVariables(
-                            self.param,
-                            domain,
-                            self.options,
-                            phase=phase,
-                            x_average=False,
-                        )
-                    )
                 self.submodels[f"{domain} {phase} particle"] = submod
-                self.submodels[f"{domain} {phase} total particle concentration"] = (
-                    pybamm.particle.TotalConcentration(
-                        self.param, domain, self.options, phase
-                    )
+                self.submodels[
+                    f"{domain} {phase} total particle concentration"
+                ] = pybamm.particle.TotalConcentration(
+                    self.param, domain, self.options, phase
                 )
 
     def set_solid_submodel(self):
@@ -115,9 +105,9 @@ class DFN(BaseModel):
             )
 
         if self.options["surface form"] == "false":
-            self.submodels["electrolyte conductivity"] = (
-                pybamm.electrolyte_conductivity.Full(self.param, self.options)
-            )
+            self.submodels[
+                "electrolyte conductivity"
+            ] = pybamm.electrolyte_conductivity.Full(self.param, self.options)
 
         if self.options["surface form"] == "false":
             surf_model = surf_form.Explicit
@@ -132,6 +122,3 @@ class DFN(BaseModel):
             self.submodels[f"{domain} surface potential difference"] = surf_model(
                 self.param, domain, self.options
             )
-
-    def set_summary_variables(self):
-        self.set_default_summary_variables()

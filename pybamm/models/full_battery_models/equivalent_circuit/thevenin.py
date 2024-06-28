@@ -6,13 +6,13 @@ from .ecm_model_options import NaturalNumberOption, OperatingModes
 class Thevenin(pybamm.BaseModel):
     """
     The classical Thevenin Equivalent Circuit Model of a battery as
-    described in, for example, :footcite:t:`Barletta2022thevenin`.
+    described in, for example, [1]_.
 
     This equivalent circuit model consists of an OCV element, a resistor
     element, and a number of RC elements (by default 1). The model is
     coupled to two lumped thermal models, one for the cell and
     one for the surrounding jig. Heat generation terms for each element
-    follow equation (1) of :footcite:t:`Nieto2012`.
+    follow equation (1) of [2]_.
 
     Parameters
     ----------
@@ -52,10 +52,19 @@ class Thevenin(pybamm.BaseModel):
 
     Examples
     --------
+    >>> import pybamm
     >>> model = pybamm.equivalent_circuit.Thevenin()
     >>> model.name
     'Thevenin Equivalent Circuit Model'
 
+
+    References
+    ----------
+    .. [1] G Barletta, D Piera, and D Papurello. "Thévenin’s Battery Model
+           Parameter Estimation Based on Simulink." Energies 15.17 (2022): 6207.
+    .. [2] N Nieto, L Díaz, J Gastelurrutia, I Alava, F Blanco, JC Ramos, and
+           A Rivas "Thermal modeling of large format lithium-ion cells."
+           Journal of The Electrochemical Society, 160(2), (2012) A212.
     """
 
     def __init__(
@@ -67,7 +76,6 @@ class Thevenin(pybamm.BaseModel):
         self.param = pybamm.EcmParameters()
         self.element_counter = 0
 
-        self.set_standard_output_variables()
         self.set_submodels(build)
 
     def set_options(self, extra_options=None):
@@ -89,13 +97,17 @@ class Thevenin(pybamm.BaseModel):
                 options[name] = opt
             else:
                 raise pybamm.OptionError(
-                    f"Option '{name}' not recognised. Best matches are {options.get_best_matches(name)}"
+                    "Option '{}' not recognised. Best matches are {}".format(
+                        name, options.get_best_matches(name)
+                    )
                 )
 
         for opt, value in options.items():
             if value not in possible_options[opt]:
                 raise pybamm.OptionError(
-                    f"Option '{opt}' must be one of {possible_options[opt]}. Got '{value}' instead."
+                    "Option '{}' must be one of {}. Got '{}' instead.".format(
+                        opt, possible_options[opt], value
+                    )
                 )
 
         self.options = options
@@ -120,7 +132,7 @@ class Thevenin(pybamm.BaseModel):
             )
         elif self.options["operating mode"] == "differential power":
             model = pybamm.external_circuit.PowerFunctionControl(
-                self.param, self.options, "differential"
+                self.param, self.options, "differential without max"
             )
         elif self.options["operating mode"] == "resistance":
             model = pybamm.external_circuit.ResistanceFunctionControl(
@@ -128,7 +140,7 @@ class Thevenin(pybamm.BaseModel):
             )
         elif self.options["operating mode"] == "differential resistance":
             model = pybamm.external_circuit.ResistanceFunctionControl(
-                self.param, self.options, "differential"
+                self.param, self.options, "differential without max"
             )
         elif self.options["operating mode"] == "CCCV":
             model = pybamm.external_circuit.CCCVFunctionControl(
@@ -139,14 +151,14 @@ class Thevenin(pybamm.BaseModel):
                 self.param,
                 self.options["operating mode"],
                 self.options,
-                control="differential",
+                control="differential without max",
             )
         self.submodels["external circuit"] = model
 
     def set_ocv_submodel(self):
-        self.submodels["Open-circuit voltage"] = (
-            pybamm.equivalent_circuit_elements.OCVElement(self.param, self.options)
-        )
+        self.submodels[
+            "Open-circuit voltage"
+        ] = pybamm.equivalent_circuit_elements.OCVElement(self.param, self.options)
 
     def set_resistor_submodel(self):
         name = "Element-0 (Resistor)"
@@ -188,22 +200,12 @@ class Thevenin(pybamm.BaseModel):
         if build:
             self.build_model()
 
-    def set_standard_output_variables(self):
-        # Time
-        self.variables.update(
-            {
-                "Time [s]": pybamm.t,
-                "Time [min]": pybamm.t / 60,
-                "Time [h]": pybamm.t / 3600,
-            }
-        )
-
     def build_model(self):
         # Build model variables and equations
         self._build_model()
 
         self._built = True
-        pybamm.logger.info(f"Finished building {self.name}")
+        pybamm.logger.info("Finished building {}".format(self.name))
 
     @property
     def default_parameter_values(self):

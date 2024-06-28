@@ -3,9 +3,7 @@
 #
 import pybamm
 
-from pybamm.models.submodels.electrolyte_conductivity.composite_conductivity import (
-    Composite,
-)
+from ..composite_conductivity import Composite
 
 
 class BaseModel(Composite):
@@ -112,9 +110,7 @@ class CompositeDifferential(BaseModel):
             f"X-averaged {domain} electrode surface potential difference [V]"
         ]
 
-        T = variables[f"X-averaged {domain} electrode temperature [K]"]
-
-        C_dl = self.domain_param.C_dl(T)
+        C_dl = self.domain_param.C_dl
 
         self.rhs[delta_phi] = 1 / C_dl * (sum_a_j_av - sum_a_j)
 

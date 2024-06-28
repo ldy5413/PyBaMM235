@@ -2,7 +2,7 @@
 # Inverse Bulter-Volmer class
 #
 import pybamm
-from pybamm.models.submodels.interface.base_interface import BaseInterface
+from ...base_interface import BaseInterface
 
 
 class InverseButlerVolmer(BaseInterface):
@@ -68,17 +68,22 @@ class InverseButlerVolmer(BaseInterface):
         eta_r = self._get_overpotential(j_tot, j0, ne, T, u)
 
         # With SEI resistance (distributed and averaged have the same effect here)
-        if self.options["SEI film resistance"] != "none":
-            R_sei = self.phase_param.R_sei
-            if self.options.electrode_types[domain] == "planar":
-                L_sei = variables[f"{Domain} total SEI thickness [m]"]
+        if self.domain == "negative":
+            if self.options["SEI film resistance"] != "none":
+                R_sei = self.phase_param.R_sei
+                if self.options.electrode_types["negative"] == "planar":
+                    L_sei = variables["Total SEI thickness [m]"]
+                else:
+                    L_sei = variables["X-averaged total SEI thickness [m]"]
+                eta_sei = -j_tot * L_sei * R_sei
+            # Without SEI resistance
             else:
-                L_sei = variables[f"X-averaged {domain} total SEI thickness [m]"]
-            eta_sei = -j_tot * L_sei * R_sei
-        # Without SEI resistance
+                eta_sei = pybamm.Scalar(0)
+            variables.update(
+                self._get_standard_sei_film_overpotential_variables(eta_sei)
+            )
         else:
             eta_sei = pybamm.Scalar(0)
-        variables.update(self._get_standard_sei_film_overpotential_variables(eta_sei))
 
         delta_phi = eta_r + ocp - eta_sei  # = phi_s - phi_e
 
@@ -131,16 +136,19 @@ class CurrentForInverseButlerVolmer(BaseInterface):
         super().__init__(param, domain, reaction, options=options)
 
     def get_coupled_variables(self, variables):
-        domain, Domain = self.domain_Domain
+        domain = self.domain
 
         j_tot = variables[
             f"X-averaged {domain} electrode total interfacial current density [A.m-2]"
         ]
-        j_sei = variables[f"{Domain} electrode SEI interfacial current density [A.m-2]"]
-        j_stripping = variables[
-            f"{Domain} electrode lithium plating interfacial current density [A.m-2]"
-        ]
-        j = j_tot - j_sei - j_stripping
+        if self.domain == "negative":
+            j_sei = variables["SEI interfacial current density [A.m-2]"]
+            j_stripping = variables[
+                "Lithium plating interfacial current density [A.m-2]"
+            ]
+            j = j_tot - j_sei - j_stripping
+        else:
+            j = j_tot
 
         variables.update(self._get_standard_interfacial_current_variables(j))
         variables.update(

@@ -14,9 +14,8 @@ from functools import cached_property
 
 class NumpyEncoder(json.JSONEncoder):
     """
-    Numpy serialiser helper class that converts numpy arrays to a list.
-    Numpy arrays cannot be directly converted to JSON, so the arrays are
-    converted to python list objects before encoding.
+    Numpy serialiser helper class that converts numpy arrays to a list
+    https://stackoverflow.com/questions/26646362/numpy-array-is-not-json-serializable
     """
 
     def default(self, obj):
@@ -26,7 +25,7 @@ class NumpyEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)  # pragma: no cover
 
 
-class Solution:
+class Solution(object):
     """
     Class containing the solution of, and various attributes associated with, a PyBaMM
     model.
@@ -131,9 +130,6 @@ class Solution:
 
         # Initialize empty summary variables
         self._summary_variables = None
-
-        # Initialise initial start time
-        self.initial_start_time = None
 
         # Solution now uses CasADi
         pybamm.citations.register("Andersson2019")
@@ -298,11 +294,11 @@ class Solution:
                 self._y = casadi.horzcat(*self.all_ys)
             else:
                 self._y = np.hstack(self.all_ys)
-        except ValueError as error:
+        except ValueError:
             raise pybamm.SolverError(
                 "The solution is made up from different models, so `y` cannot be "
                 "computed explicitly."
-            ) from error
+            )
 
     def check_ys_are_not_too_large(self):
         # Only check last one so that it doesn't take too long
@@ -312,19 +308,7 @@ class Solution:
         y = y[:, -1]
         if np.any(y > pybamm.settings.max_y_value):
             for var in [*model.rhs.keys(), *model.algebraic.keys()]:
-                var = model.variables[var.name]
-                # find the statevector corresponding to this variable
-                statevector = None
-                for node in var.pre_order():
-                    if isinstance(node, pybamm.StateVector):
-                        statevector = node
-
-                # there will always be a statevector, but just in case
-                if statevector is None:  # pragma: no cover
-                    raise RuntimeError(
-                        f"Cannot find statevector corresponding to variable {var.name}"
-                    )
-                y_var = y[statevector.y_slices[0]]
+                y_var = y[model.variables[var.name].y_slices[0]]
                 if np.any(y_var > pybamm.settings.max_y_value):
                     pybamm.logger.error(
                         f"Solution for '{var}' exceeds the maximum allowed value "
@@ -437,15 +421,6 @@ class Solution:
     def summary_variables(self):
         return self._summary_variables
 
-    @property
-    def initial_start_time(self):
-        return self._initial_start_time
-
-    @initial_start_time.setter
-    def initial_start_time(self, value):
-        """Updates the initial start time of the experiment"""
-        self._initial_start_time = value
-
     def set_summary_variables(self, all_summary_variables):
         summary_variables = {var: [] for var in all_summary_variables[0]}
         for sum_vars in all_summary_variables:
@@ -470,7 +445,7 @@ class Solution:
         # Process
         for key in variables:
             cumtrapz_ic = None
-            pybamm.logger.debug(f"Post-processing {key}")
+            pybamm.logger.debug("Post-processing {}".format(key))
             vars_pybamm = [model.variables_and_events[key] for model in self.all_models]
 
             # Iterate through all models, some may be in the list several times and
@@ -479,33 +454,17 @@ class Solution:
             for i, (model, ys, inputs, var_pybamm) in enumerate(
                 zip(self.all_models, self.all_ys, self.all_inputs, vars_pybamm)
             ):
-                if ys.size == 0 and var_pybamm.has_symbol_of_classes(
-                    pybamm.expression_tree.state_vector.StateVector
-                ):
-                    raise KeyError(
-                        f"Cannot process variable '{key}' as it was not part of the "
-                        "solve. Please re-run the solve with `output_variables` set to "
-                        "include this variable."
-                    )
-                elif isinstance(var_pybamm, pybamm.ExplicitTimeIntegral):
+                if isinstance(var_pybamm, pybamm.ExplicitTimeIntegral):
                     cumtrapz_ic = var_pybamm.initial_condition
                     cumtrapz_ic = cumtrapz_ic.evaluate()
                     var_pybamm = var_pybamm.child
-                    var_casadi = self.process_casadi_var(
-                        var_pybamm,
-                        inputs,
-                        ys.shape,
-                    )
+                    var_casadi = self.process_casadi_var(var_pybamm, inputs, ys)
                     model._variables_casadi[key] = var_casadi
                     vars_pybamm[i] = var_pybamm
                 elif key in model._variables_casadi:
                     var_casadi = model._variables_casadi[key]
                 else:
-                    var_casadi = self.process_casadi_var(
-                        var_pybamm,
-                        inputs,
-                        ys.shape,
-                    )
+                    var_casadi = self.process_casadi_var(var_pybamm, inputs, ys)
                     model._variables_casadi[key] = var_casadi
                 vars_casadi.append(var_casadi)
             var = pybamm.ProcessedVariable(
@@ -516,9 +475,9 @@ class Solution:
             self._variables[key] = var
             self.data[key] = var.data
 
-    def process_casadi_var(self, var_pybamm, inputs, ys_shape):
+    def process_casadi_var(self, var_pybamm, inputs, ys):
         t_MX = casadi.MX.sym("t")
-        y_MX = casadi.MX.sym("y", ys_shape[0])
+        y_MX = casadi.MX.sym("y", ys.shape[0])
         inputs_MX_dict = {
             key: casadi.MX.sym("input", value.shape[0]) for key, value in inputs.items()
         }
@@ -697,7 +656,7 @@ class Solution:
                         or (i > 0 and 48 <= ord(s) <= 57)
                     ):
                         raise ValueError(
-                            f"Invalid character '{s}' found in '{name}'. "
+                            "Invalid character '{}' found in '{}'. ".format(s, name)
                             + "MATLAB variable names must only contain a-z, A-Z, _, "
                             "or 0-9 (except the first position). "
                             "Use the 'short_names' argument to pass an alternative "
@@ -711,7 +670,9 @@ class Solution:
             for name, var in data.items():
                 if var.ndim >= 2:
                     raise ValueError(
-                        f"only 0D variables can be saved to csv, but '{name}' is {var.ndim - 1}D"
+                        "only 0D variables can be saved to csv, but '{}' is {}D".format(
+                            name, var.ndim - 1
+                        )
                     )
             df = pd.DataFrame(data)
             return df.to_csv(filename, index=False)
@@ -722,7 +683,7 @@ class Solution:
                 with open(filename, "w") as outfile:
                     json.dump(data, outfile, cls=NumpyEncoder)
         else:
-            raise ValueError(f"format '{to_format}' not recognised")
+            raise ValueError("format '{}' not recognised".format(to_format))
 
     @property
     def sub_solutions(self):
@@ -808,43 +769,6 @@ class Solution:
 
         return new_sol
 
-    def plot_voltage_components(
-        self,
-        ax=None,
-        show_legend=True,
-        split_by_electrode=False,
-        show_plot=True,
-        **kwargs_fill,
-    ):
-        """
-        Generate a plot showing the component overpotentials that make up the voltage
-
-        Parameters
-        ----------
-        ax : matplotlib Axis, optional
-            The axis on which to put the plot. If None, a new figure and axis is created.
-        show_legend : bool, optional
-            Whether to display the legend. Default is True.
-        split_by_electrode : bool, optional
-            Whether to show the overpotentials for the negative and positive electrodes
-            separately. Default is False.
-        show_plot : bool, optional
-            Whether to show the plots. Default is True. Set to False if you want to
-            only display the plot after plt.show() has been called.
-        kwargs_fill
-            Keyword arguments, passed to ax.fill_between.
-
-        """
-        # Use 'self' here as the solution object
-        return pybamm.plot_voltage_components(
-            self,
-            ax=ax,
-            show_legend=show_legend,
-            split_by_electrode=split_by_electrode,
-            show_plot=show_plot,
-            **kwargs_fill,
-        )
-
 
 class EmptySolution:
     def __init__(self, termination=None, t=None):
@@ -868,9 +792,7 @@ class EmptySolution:
         return EmptySolution(termination=self.termination, t=self.t)
 
 
-def make_cycle_solution(
-    step_solutions, esoh_solver=None, save_this_cycle=True, inputs=None
-):
+def make_cycle_solution(step_solutions, esoh_solver=None, save_this_cycle=True):
     """
     Function to create a Solution for an entire cycle, and associated summary variables
 
@@ -881,7 +803,7 @@ def make_cycle_solution(
     esoh_solver : :class:`pybamm.lithium_ion.ElectrodeSOHSolver`
         Solver to calculate electrode SOH (eSOH) variables. If `None` (default)
         then only summary variables that do not require the eSOH calculation
-        are calculated. See :footcite:t:`Mohtat2019` for more details on eSOH variables.
+        are calculated. See [1] for more details on eSOH variables.
     save_this_cycle : bool, optional
         Whether to save the entire cycle variables or just the summary variables.
         Default True
@@ -892,6 +814,12 @@ def make_cycle_solution(
         The Solution object for this cycle, or None (if save_this_cycle is False)
     cycle_summary_variables : dict
         Dictionary of summary variables for this cycle
+
+    References
+    ----------
+    .. [1] Mohtat, P., Lee, S., Siegel, J. B., & Stefanopoulou, A. G. (2019). Towards
+    better estimability of electrode-specific state of health: Decoding the cell
+    expansion. Journal of Power Sources, 427, 101-111.
 
     """
     sum_sols = step_solutions[0].copy()
@@ -916,9 +844,7 @@ def make_cycle_solution(
 
     cycle_solution.steps = step_solutions
 
-    cycle_summary_variables = _get_cycle_summary_variables(
-        cycle_solution, esoh_solver, user_inputs=inputs
-    )
+    cycle_summary_variables = _get_cycle_summary_variables(cycle_solution, esoh_solver)
 
     cycle_first_state = cycle_solution.first_state
 
@@ -930,43 +856,68 @@ def make_cycle_solution(
     return cycle_solution, cycle_summary_variables, cycle_first_state
 
 
-def _get_cycle_summary_variables(cycle_solution, esoh_solver, user_inputs=None):
-    user_inputs = user_inputs or {}
+def _get_cycle_summary_variables(cycle_solution, esoh_solver):
     model = cycle_solution.all_models[0]
     cycle_summary_variables = pybamm.FuzzyDict({})
 
-    # Summary variables
-    summary_variables = model.summary_variables
+    # Measured capacity variables
+    if "Discharge capacity [A.h]" in model.variables:
+        Q = cycle_solution["Discharge capacity [A.h]"].data
+        min_Q, max_Q = np.min(Q), np.max(Q)
+
+        cycle_summary_variables.update(
+            {
+                "Minimum measured discharge capacity [A.h]": min_Q,
+                "Maximum measured discharge capacity [A.h]": max_Q,
+                "Measured capacity [A.h]": max_Q - min_Q,
+            }
+        )
+
+    # Voltage variables
+    if "Battery voltage [V]" in model.variables:
+        V = cycle_solution["Battery voltage [V]"].data
+        min_V, max_V = np.min(V), np.max(V)
+
+        cycle_summary_variables.update(
+            {"Minimum voltage [V]": min_V, "Maximum voltage [V]": max_V}
+        )
+
+    # Degradation variables
+    degradation_variables = model.summary_variables
     first_state = cycle_solution.first_state
     last_state = cycle_solution.last_state
-    for var in summary_variables:
-        data_first = first_state[var].data
-        data_last = last_state[var].data
+    for var in degradation_variables:
+        if 'Throughput' in var:
+            data_first = [cycle_solution[var].data[0]]
+            data_last = [cycle_solution[var].data[-1]]
+        else:
+            data_first = first_state[var].data
+            data_last = last_state[var].data
         cycle_summary_variables[var] = data_last[0]
         var_lowercase = var[0].lower() + var[1:]
         cycle_summary_variables["Change in " + var_lowercase] = (
             data_last[0] - data_first[0]
         )
-
+    #import pdb; pdb.set_trace()
     # eSOH variables (full-cell lithium-ion model only, for now)
     if (
         esoh_solver is not None
         and isinstance(model, pybamm.lithium_ion.BaseModel)
         and model.options.electrode_types["negative"] == "porous"
-        and "Negative electrode capacity [A.h]" in model.variables
-        and "Positive electrode capacity [A.h]" in model.variables
     ):
         Q_n = last_state["Negative electrode capacity [A.h]"].data[0]
         Q_p = last_state["Positive electrode capacity [A.h]"].data[0]
         Q_Li = last_state["Total lithium capacity in particles [A.h]"].data[0]
-        all_inputs = {**user_inputs, "Q_n": Q_n, "Q_p": Q_p, "Q_Li": Q_Li}
+
+        inputs = {"Q_n": Q_n, "Q_p": Q_p, "Q_Li": Q_Li}
+
         try:
-            esoh_sol = esoh_solver.solve(inputs=all_inputs)
-        except pybamm.SolverError as error:  # pragma: no cover
+            esoh_sol = esoh_solver.solve(inputs)
+        except pybamm.SolverError:  # pragma: no cover
             raise pybamm.SolverError(
                 "Could not solve for summary variables, run "
                 "`sim.solve(calc_esoh=False)` to skip this step"
-            ) from error
+            )
 
         cycle_summary_variables.update(esoh_sol)
 

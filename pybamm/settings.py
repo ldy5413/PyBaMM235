@@ -3,11 +3,11 @@
 #
 
 
-class Settings:
+class Settings(object):
     _debug_mode = False
     _simplify = True
-    _min_max_mode = "exact"
-    _min_max_smoothing = 10
+    _min_smoothing = "exact"
+    _max_smoothing = "exact"
     _heaviside_smoothing = "exact"
     _abs_smoothing = "exact"
     max_words_in_line = 4
@@ -43,43 +43,35 @@ class Settings:
         self._simplify = value
 
     def set_smoothing_parameters(self, k):
-        """Helper function to set all smoothing parameters"""
-        if k == "exact":
-            self.min_max_mode = "exact"
-        else:
-            self.min_max_smoothing = k
-            self.min_max_mode = "soft"
+        "Helper function to set all smoothing parameters"
+        self.min_smoothing = k
+        self.max_smoothing = k
         self.heaviside_smoothing = k
         self.abs_smoothing = k
 
-    @staticmethod
-    def check_k(k):
+    def check_k(self, k):
         if k != "exact" and k <= 0:
             raise ValueError(
-                "Smoothing parameter must be 'exact' or a strictly positive number"
+                "smoothing parameter must be 'exact' or a strictly positive number"
             )
 
     @property
-    def min_max_mode(self):
-        return self._min_max_mode
+    def min_smoothing(self):
+        return self._min_smoothing
 
-    @min_max_mode.setter
-    def min_max_mode(self, mode):
-        if mode not in ["exact", "soft", "smooth"]:
-            raise ValueError("Smoothing mode must be 'exact', 'soft', or 'smooth'")
-        self._min_max_mode = mode
+    @min_smoothing.setter
+    def min_smoothing(self, k):
+        self.check_k(k)
+        self._min_smoothing = k
 
     @property
-    def min_max_smoothing(self):
-        return self._min_max_smoothing
+    def max_smoothing(self):
+        return self._max_smoothing
 
-    @min_max_smoothing.setter
-    def min_max_smoothing(self, k):
-        if self._min_max_mode == "soft" and k <= 0:
-            raise ValueError("Smoothing parameter must be a strictly positive number")
-        if self._min_max_mode == "smooth" and k < 1:
-            raise ValueError("Smoothing parameter must be greater than 1")
-        self._min_max_smoothing = k
+    @max_smoothing.setter
+    def max_smoothing(self, k):
+        self.check_k(k)
+        self._max_smoothing = k
 
     @property
     def heaviside_smoothing(self):

@@ -1,17 +1,11 @@
 #
 # Variable class
 #
-from __future__ import annotations
+
 import numpy as np
+import sympy
 import numbers
 import pybamm
-import sympy
-from pybamm.type_definitions import (
-    DomainType,
-    AuxiliaryDomainType,
-    DomainsType,
-    Numeric,
-)
 
 
 class VariableBase(pybamm.Symbol):
@@ -55,14 +49,14 @@ class VariableBase(pybamm.Symbol):
 
     def __init__(
         self,
-        name: str,
-        domain: DomainType = None,
-        auxiliary_domains: AuxiliaryDomainType = None,
-        domains: DomainsType = None,
-        bounds: tuple[pybamm.Symbol] | None = None,
-        print_name: str | None = None,
-        scale: float | pybamm.Symbol | None = 1,
-        reference: float | pybamm.Symbol | None = 0,
+        name,
+        domain=None,
+        auxiliary_domains=None,
+        domains=None,
+        bounds=None,
+        print_name=None,
+        scale=1,
+        reference=0,
     ):
         if isinstance(scale, numbers.Number):
             scale = pybamm.Scalar(scale)
@@ -88,7 +82,7 @@ class VariableBase(pybamm.Symbol):
         return self._bounds
 
     @bounds.setter
-    def bounds(self, values: tuple[Numeric, Numeric]):
+    def bounds(self, values):
         if values is None:
             values = (-np.inf, np.inf)
         else:
@@ -109,20 +103,11 @@ class VariableBase(pybamm.Symbol):
 
     def set_id(self):
         self._id = hash(
-            (
-                self.__class__,
-                self.name,
-                self.scale,
-                self.reference,
-                *tuple([(k, tuple(v)) for k, v in self.domains.items() if v != []]),
-            )
+            (self.__class__, self.name, self.scale, self.reference)
+            + tuple([(k, tuple(v)) for k, v in self.domains.items() if v != []])
         )
 
-    def create_copy(
-        self,
-        new_children=None,
-        perform_simplifications=True,
-    ):
+    def create_copy(self):
         """See :meth:`pybamm.Symbol.new_copy()`."""
         return self.__class__(
             self.name,
@@ -143,13 +128,6 @@ class VariableBase(pybamm.Symbol):
             return sympy.Symbol(self.print_name)
         else:
             return self.name
-
-    def to_json(
-        self,
-    ):
-        raise NotImplementedError(
-            "pybamm.Variable: Serialisation is only implemented for discretised models."
-        )
 
 
 class Variable(VariableBase):
@@ -192,7 +170,7 @@ class Variable(VariableBase):
         Default is 0.
     """
 
-    def diff(self, variable: pybamm.Symbol):
+    def diff(self, variable):
         if variable == self:
             return pybamm.Scalar(1)
         elif variable == pybamm.t:
@@ -246,7 +224,7 @@ class VariableDot(VariableBase):
         Default is 0.
     """
 
-    def get_variable(self) -> pybamm.Variable:
+    def get_variable(self):
         """
         return a :class:`.Variable` corresponding to this VariableDot
 
@@ -255,7 +233,7 @@ class VariableDot(VariableBase):
         """
         return Variable(self.name[:-1], domains=self.domains, scale=self.scale)
 
-    def diff(self, variable: pybamm.Symbol) -> pybamm.Scalar:
+    def diff(self, variable):
         if variable == self:
             return pybamm.Scalar(1)
         elif variable == pybamm.t:

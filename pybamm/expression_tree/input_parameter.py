@@ -1,13 +1,10 @@
 #
 # Parameter classes
 #
-from __future__ import annotations
 import numbers
 import numpy as np
 import scipy.sparse
 import pybamm
-
-from pybamm.type_definitions import DomainType
 
 
 class InputParameter(pybamm.Symbol):
@@ -28,12 +25,7 @@ class InputParameter(pybamm.Symbol):
         The size of the input parameter expected, defaults to 1 (scalar input)
     """
 
-    def __init__(
-        self,
-        name: str,
-        domain: DomainType = None,
-        expected_size: int | None = None,
-    ) -> None:
+    def __init__(self, name, domain=None, expected_size=None):
         # Expected size defaults to 1 if no domain else None (gets set later)
         if expected_size is None:
             if domain is None:
@@ -43,19 +35,7 @@ class InputParameter(pybamm.Symbol):
         self._expected_size = expected_size
         super().__init__(name, domain=domain)
 
-    @classmethod
-    def _from_json(cls, snippet: dict):
-        return cls(
-            snippet["name"],
-            domain=snippet["domain"],
-            expected_size=snippet["expected_size"],
-        )
-
-    def create_copy(
-        self,
-        new_children=None,
-        perform_simplifications=True,
-    ) -> pybamm.InputParameter:
+    def create_copy(self):
         """See :meth:`pybamm.Symbol.new_copy()`."""
         new_input_parameter = InputParameter(
             self.name, self.domain, expected_size=self._expected_size
@@ -74,7 +54,7 @@ class InputParameter(pybamm.Symbol):
         else:
             return np.nan * np.ones((self._expected_size, 1))
 
-    def _jac(self, variable: pybamm.StateVector) -> pybamm.Matrix:
+    def _jac(self, variable):
         """See :meth:`pybamm.Symbol._jac()`."""
         n_variable = variable.evaluation_array.count(True)
         nan_vector = self._evaluate_for_shape()
@@ -85,13 +65,7 @@ class InputParameter(pybamm.Symbol):
         zero_matrix = scipy.sparse.csr_matrix((n_self, n_variable))
         return pybamm.Matrix(zero_matrix)
 
-    def _base_evaluate(
-        self,
-        t: float | None = None,
-        y: np.ndarray | None = None,
-        y_dot: np.ndarray | None = None,
-        inputs: dict | str | None = None,
-    ):
+    def _base_evaluate(self, t=None, y=None, y_dot=None, inputs=None):
         # inputs should be a dictionary
         # convert 'None' to empty dictionary for more informative error
         if inputs is None:
@@ -104,8 +78,8 @@ class InputParameter(pybamm.Symbol):
         try:
             input_eval = inputs[self.name]
         # raise more informative error if can't find name in dict
-        except KeyError as error:
-            raise KeyError(f"Input parameter '{self.name}' not found") from error
+        except KeyError:
+            raise KeyError("Input parameter '{}' not found".format(self.name))
 
         if isinstance(input_eval, numbers.Number):
             input_size = 1
@@ -120,20 +94,10 @@ class InputParameter(pybamm.Symbol):
                 return input_eval
         else:
             raise ValueError(
-                f"Input parameter '{self.name}' was given an object of size '{input_size}'"
-                + f" but was expecting an object of size '{self._expected_size}'."
+                "Input parameter '{}' was given an object of size '{}'".format(
+                    self.name, input_size
+                )
+                + " but was expecting an object of size '{}'.".format(
+                    self._expected_size
+                )
             )
-
-    def to_json(self):
-        """
-        Method to serialise an InputParameter object into JSON.
-        """
-
-        json_dict = {
-            "name": self.name,
-            "id": self.id,
-            "domain": self.domain,
-            "expected_size": self._expected_size,
-        }
-
-        return json_dict

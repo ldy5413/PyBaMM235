@@ -1,15 +1,9 @@
 #
 # Helper function to unpack a symbol
 #
-from __future__ import annotations
-from typing import TYPE_CHECKING
-from collections.abc import Sequence
-
-if TYPE_CHECKING:  # pragma: no cover
-    import pybamm
 
 
-class SymbolUnpacker:
+class SymbolUnpacker(object):
     """
     Helper class to unpack a (set of) symbol(s) to find all instances of a class.
     Uses caching to speed up the process.
@@ -22,17 +16,11 @@ class SymbolUnpacker:
         cached unpacked equations
     """
 
-    def __init__(
-        self,
-        classes_to_find: Sequence[pybamm.Symbol] | pybamm.Symbol,
-        unpacked_symbols: dict | None = None,
-    ):
+    def __init__(self, classes_to_find, unpacked_symbols=None):
         self.classes_to_find = classes_to_find
-        self._unpacked_symbols: dict = unpacked_symbols or {}
+        self._unpacked_symbols = unpacked_symbols or {}
 
-    def unpack_list_of_symbols(
-        self, list_of_symbols: Sequence[pybamm.Symbol]
-    ) -> set[pybamm.Symbol]:
+    def unpack_list_of_symbols(self, list_of_symbols):
         """
         Unpack a list of symbols. See :meth:`SymbolUnpacker.unpack()`
 
@@ -53,9 +41,7 @@ class SymbolUnpacker:
 
         return all_instances
 
-    def unpack_symbol(
-        self, symbol: Sequence[pybamm.Symbol] | pybamm.Symbol
-    ) -> list[pybamm.Symbol]:
+    def unpack_symbol(self, symbol):
         """
         This function recurses down the tree, unpacking the symbols and saving the ones
         that have a class in `self.classes_to_find`.

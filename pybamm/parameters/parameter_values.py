@@ -5,7 +5,6 @@ import numpy as np
 import pybamm
 import numbers
 from pprint import pformat
-from warnings import warn
 from collections import defaultdict
 
 
@@ -25,6 +24,7 @@ class ParameterValues:
 
     Examples
     --------
+    >>> import pybamm
     >>> values = {"some parameter": 1, "another parameter": 2}
     >>> param = pybamm.ParameterValues(values)
     >>> param["some parameter"]
@@ -60,15 +60,10 @@ class ParameterValues:
             self.update(values, check_already_exists=False)
         else:
             # Check if values is a named parameter set
-            if isinstance(values, str) and values in pybamm.parameter_sets.keys():
+            if isinstance(values, str) and values in pybamm.parameter_sets:
                 values = pybamm.parameter_sets[values]
                 values.pop("chemistry", None)
                 self.update(values, check_already_exists=False)
-            else:
-                valid_sets = "\n".join(pybamm.parameter_sets.keys())
-                raise ValueError(
-                    f"'{values}' is not a valid parameter set. Parameter set must be one of:\n{valid_sets}"
-                )
 
         # Initialise empty _processed_symbols dict (for caching)
         self._processed_symbols = {}
@@ -98,66 +93,21 @@ class ParameterValues:
             raise ValueError("Target SOC should be between 0 and 1")
 
         from bpx import parse_bpx_file, get_electrode_concentrations
-        from bpx.schema import ElectrodeBlended, ElectrodeBlendedSPM
         from .bpx import _bpx_to_param_dict
 
         # parse bpx
         bpx = parse_bpx_file(filename)
         pybamm_dict = _bpx_to_param_dict(bpx)
 
-        if "Open-circuit voltage at 0% SOC [V]" not in pybamm_dict:
-            pybamm_dict["Open-circuit voltage at 0% SOC [V]"] = pybamm_dict[
-                "Lower voltage cut-off [V]"
-            ]
-            pybamm_dict["Open-circuit voltage at 100% SOC [V]"] = pybamm_dict[
-                "Upper voltage cut-off [V]"
-            ]
-            # probably should put a warning here to indicate we are going
-            # ahead with the low voltage limit.
-
         # get initial concentrations based on SOC
-        # Note: we cannot set SOC for blended electrodes,
-        # see https://github.com/pybamm-team/PyBaMM/issues/2682
-        bpx_neg = bpx.parameterisation.negative_electrode
-        bpx_pos = bpx.parameterisation.positive_electrode
-        if isinstance(bpx_neg, (ElectrodeBlended, ElectrodeBlendedSPM)) or isinstance(
-            bpx_pos, (ElectrodeBlended, ElectrodeBlendedSPM)
-        ):
-            pybamm.logger.warning(
-                "Initial concentrations cannot be set using stoichiometry limits for "
-                "blend electrodes. Please set the initial concentrations manually."
-            )
-        else:
-            c_n_init, c_p_init = get_electrode_concentrations(target_soc, bpx)
-            pybamm_dict["Initial concentration in negative electrode [mol.m-3]"] = (
-                c_n_init
-            )
-            pybamm_dict["Initial concentration in positive electrode [mol.m-3]"] = (
-                c_p_init
-            )
+        c_n_init, c_p_init = get_electrode_concentrations(target_soc, bpx)
+        pybamm_dict["Initial concentration in negative electrode [mol.m-3]"] = c_n_init
+        pybamm_dict["Initial concentration in positive electrode [mol.m-3]"] = c_p_init
 
         return pybamm.ParameterValues(pybamm_dict)
 
     def __getitem__(self, key):
-        try:
-            return self._dict_items[key]
-        except KeyError as err:
-            if (
-                "Exchange-current density for lithium metal electrode [A.m-2]"
-                in err.args[0]
-                and "Exchange-current density for plating [A.m-2]" in self._dict_items
-            ):
-                raise KeyError(
-                    "'Exchange-current density for plating [A.m-2]' has been renamed "
-                    "to 'Exchange-current density for lithium metal electrode [A.m-2]' "
-                    "when referring to the reaction at the surface of a lithium metal "
-                    "electrode. This is to avoid confusion with the exchange-current "
-                    "density for the lithium plating reaction in a porous negative "
-                    "electrode. To avoid this error, change your parameter file to use "
-                    "the new name."
-                ) from err
-            else:
-                raise err
+        return self._dict_items[key]
 
     def get(self, key, default=None):
         """Return item corresponding to key if it exists, otherwise return default"""
@@ -233,7 +183,7 @@ class ParameterValues:
         if not isinstance(values, dict):
             values = values._dict_items
         # check parameter values
-        values = self.check_parameter_values(values)
+        self.check_parameter_values(values)
         # update
         for name, value in values.items():
             # check for conflicts
@@ -243,7 +193,9 @@ class ParameterValues:
                 and not (self[name] == float(value) or self[name] == value)
             ):
                 raise ValueError(
-                    f"parameter '{name}' already defined with value '{self[name]}'"
+                    "parameter '{}' already defined with value '{}'".format(
+                        name, self[name]
+                    )
                 )
             # check parameter already exists (for updating parameters)
             if check_already_exists is True:
@@ -251,11 +203,12 @@ class ParameterValues:
                     self._dict_items[name]
                 except KeyError as err:
                     raise KeyError(
-                        f"Cannot update parameter '{name}' as it does not "
-                        + f"have a default value. ({err.args[0]}). If you are "
+                        "Cannot update parameter '{}' as it does not ".format(name)
+                        + "have a default value. ({}). If you are ".format(err.args[0])
                         + "sure you want to update this parameter, use "
                         + "param.update({{name: value}}, check_already_exists=False)"
-                    ) from err
+                    )
+            # if no conflicts, update
             if isinstance(value, str):
                 if (
                     value.startswith("[function]")
@@ -268,7 +221,7 @@ class ParameterValues:
                         "or [2D data] is no longer supported. For functions, pass in a "
                         "python function object. For data, pass in a python function "
                         "that returns a pybamm Interpolant object. "
-                        "See the Ai2020 parameter set for an example with both."
+                        "See https://tinyurl.com/merv43ss for an example with both."
                     )
 
                 elif value == "[input]":
@@ -288,67 +241,20 @@ class ParameterValues:
         # reset processed symbols
         self._processed_symbols = {}
 
-    def set_initial_stoichiometry_half_cell(
-        self,
-        initial_value,
-        param=None,
-        known_value="cyclable lithium capacity",
-        inplace=True,
-        options=None,
-        inputs=None,
-    ):
-        """
-        Set the initial stoichiometry of the working electrode, based on the initial
-        SOC or voltage
-        """
-        param = param or pybamm.LithiumIonParameters(options)
-        x = pybamm.lithium_ion.get_initial_stoichiometry_half_cell(
-            initial_value,
-            self,
-            param=param,
-            known_value=known_value,
-            options=options,
-            inputs=inputs,
-        )
-        if inplace:
-            parameter_values = self
-        else:
-            parameter_values = self.copy()
-
-        c_max = self.evaluate(param.p.prim.c_max)
-
-        parameter_values.update(
-            {
-                "Initial concentration in {} electrode [mol.m-3]".format(
-                    options["working electrode"]
-                ): x * c_max
-            }
-        )
-        return parameter_values
-
     def set_initial_stoichiometries(
         self,
         initial_value,
         param=None,
         known_value="cyclable lithium capacity",
         inplace=True,
-        options=None,
-        inputs=None,
-        tol=1e-6,
     ):
         """
         Set the initial stoichiometry of each electrode, based on the initial
         SOC or voltage
         """
-        param = param or pybamm.LithiumIonParameters(options)
+        param = param or pybamm.LithiumIonParameters()
         x, y = pybamm.lithium_ion.get_initial_stoichiometries(
-            initial_value,
-            self,
-            param=param,
-            known_value=known_value,
-            options=options,
-            tol=tol,
-            inputs=inputs,
+            initial_value, self, param=param, known_value=known_value
         )
         if inplace:
             parameter_values = self
@@ -364,37 +270,8 @@ class ParameterValues:
         )
         return parameter_values
 
-    def set_initial_ocps(
-        self,
-        initial_value,
-        param=None,
-        known_value="cyclable lithium capacity",
-        inplace=True,
-        options=None,
-    ):
-        """
-        Set the initial OCP of each electrode, based on the initial
-        SOC or voltage
-        """
-        param = param or pybamm.LithiumIonParameters(options)
-        Un, Up = pybamm.lithium_ion.get_initial_ocps(
-            initial_value, self, param=param, known_value=known_value, options=options
-        )
-        if inplace:
-            parameter_values = self
-        else:
-            parameter_values = self.copy()
-        parameter_values.update(
-            {
-                "Initial voltage in negative electrode [V]": Un,
-                "Initial voltage in positive electrode [V]": Up,
-            }
-        )
-        return parameter_values
-
-    @staticmethod
-    def check_parameter_values(values):
-        for param in list(values.keys()):
+    def check_parameter_values(self, values):
+        for param in values:
             if "propotional term" in param:
                 raise ValueError(
                     f"The parameter '{param}' has been renamed to "
@@ -406,16 +283,6 @@ class ParameterValues:
                 raise ValueError(
                     f"parameter '{param}' has been renamed to " "'Thermodynamic factor'"
                 )
-            if "electrode diffusivity" in param:
-                new_param = param.replace("electrode", "particle")
-                warn(
-                    f"The parameter '{param}' has been renamed to '{new_param}'",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-                values[new_param] = values.get(param)
-
-        return values
 
     def process_model(self, unprocessed_model, inplace=True):
         """Assign parameter values to a model.
@@ -436,7 +303,9 @@ class ParameterValues:
             `model.variables = {}`)
 
         """
-        pybamm.logger.info(f"Start setting parameters for {unprocessed_model.name}")
+        pybamm.logger.info(
+            "Start setting parameters for {}".format(unprocessed_model.name)
+        )
 
         # set up inplace vs not inplace
         if inplace:
@@ -456,14 +325,18 @@ class ParameterValues:
 
         new_rhs = {}
         for variable, equation in unprocessed_model.rhs.items():
-            pybamm.logger.verbose(f"Processing parameters for {variable!r} (rhs)")
+            pybamm.logger.verbose(
+                "Processing parameters for {!r} (rhs)".format(variable)
+            )
             new_variable = self.process_symbol(variable)
             new_rhs[new_variable] = self.process_symbol(equation)
         model.rhs = new_rhs
 
         new_algebraic = {}
         for variable, equation in unprocessed_model.algebraic.items():
-            pybamm.logger.verbose(f"Processing parameters for {variable!r} (algebraic)")
+            pybamm.logger.verbose(
+                "Processing parameters for {!r} (algebraic)".format(variable)
+            )
             new_variable = self.process_symbol(variable)
             new_algebraic[new_variable] = self.process_symbol(equation)
         model.algebraic = new_algebraic
@@ -471,7 +344,7 @@ class ParameterValues:
         new_initial_conditions = {}
         for variable, equation in unprocessed_model.initial_conditions.items():
             pybamm.logger.verbose(
-                f"Processing parameters for {variable!r} (initial conditions)"
+                "Processing parameters for {!r} (initial conditions)".format(variable)
             )
             new_variable = self.process_symbol(variable)
             new_initial_conditions[new_variable] = self.process_symbol(equation)
@@ -481,13 +354,17 @@ class ParameterValues:
 
         new_variables = {}
         for variable, equation in unprocessed_model.variables.items():
-            pybamm.logger.verbose(f"Processing parameters for {variable!r} (variables)")
+            pybamm.logger.verbose(
+                "Processing parameters for {!r} (variables)".format(variable)
+            )
             new_variables[variable] = self.process_symbol(equation)
         model.variables = new_variables
 
         new_events = []
         for event in unprocessed_model.events:
-            pybamm.logger.verbose(f"Processing parameters for event '{event.name}''")
+            pybamm.logger.verbose(
+                "Processing parameters for event '{}''".format(event.name)
+            )
             new_events.append(
                 pybamm.Event(
                     event.name, self.process_symbol(event.expression), event.event_type
@@ -496,7 +373,9 @@ class ParameterValues:
 
         interpolant_events = self._get_interpolant_events(model)
         for event in interpolant_events:
-            pybamm.logger.verbose(f"Processing parameters for event '{event.name}''")
+            pybamm.logger.verbose(
+                "Processing parameters for event '{}''".format(event.name)
+            )
             new_events.append(
                 pybamm.Event(
                     event.name, self.process_symbol(event.expression), event.event_type
@@ -505,7 +384,7 @@ class ParameterValues:
 
         model.events = new_events
 
-        pybamm.logger.info(f"Finish setting parameters for {model.name}")
+        pybamm.logger.info("Finish setting parameters for {}".format(model.name))
 
         return model
 
@@ -553,7 +432,7 @@ class ParameterValues:
                 try:
                     bc, typ = bcs[side]
                     pybamm.logger.verbose(
-                        f"Processing parameters for {variable!r} ({side} bc)"
+                        "Processing parameters for {!r} ({} bc)".format(variable, side)
                     )
                     processed_bc = (self.process_symbol(bc), typ)
                     new_boundary_conditions[processed_variable][side] = processed_bc
@@ -564,7 +443,7 @@ class ParameterValues:
                         pass
                     # do raise error otherwise (e.g. can't process symbol)
                     else:
-                        raise err
+                        raise KeyError(err)
 
         return new_boundary_conditions
 
@@ -590,11 +469,11 @@ class ParameterValues:
             for spatial_variable, spatial_limits in geometry[domain].items():
                 # process tab information if using 1 or 2D current collectors
                 if spatial_variable == "tabs":
-                    for tab, position_info in spatial_limits.items():
-                        for position_size, sym in position_info.items():
-                            geometry[domain]["tabs"][tab][position_size] = (
-                                process_and_check(sym)
-                            )
+                    for tab, position_size in spatial_limits.items():
+                        for position_size, sym in position_size.items():
+                            geometry[domain]["tabs"][tab][
+                                position_size
+                            ] = process_and_check(sym)
                 else:
                     for lim, sym in spatial_limits.items():
                         geometry[domain][spatial_variable][lim] = process_and_check(sym)
@@ -638,7 +517,7 @@ class ParameterValues:
                 new_value.copy_domains(symbol)
                 return new_value
             else:
-                raise TypeError(f"Cannot process parameter '{value}'")
+                raise TypeError("Cannot process parameter '{}'".format(value))
 
         elif isinstance(symbol, pybamm.FunctionParameter):
             function_name = self[symbol.name]
@@ -688,7 +567,7 @@ class ParameterValues:
 
                 else:  # pragma: no cover
                     raise ValueError(
-                        f"Invalid function name length: {len(function_name)}"
+                        "Invalid function name length: {0}".format(len(function_name))
                     )
 
             elif isinstance(function_name, numbers.Number):
@@ -712,7 +591,7 @@ class ParameterValues:
                 function = function_name
             else:
                 raise TypeError(
-                    f"Parameter provided for '{symbol.name}' "
+                    "Parameter provided for '{}' ".format(symbol.name)
                     + "is of the wrong type (should either be scalar-like or callable)"
                 )
             # Differentiate if necessary
@@ -726,10 +605,21 @@ class ParameterValues:
             # Process again just to be sure
             return self.process_symbol(function_out)
 
+        elif isinstance(symbol, pybamm.BinaryOperator):
+            # process children
+            new_left = self.process_symbol(symbol.left)
+            new_right = self.process_symbol(symbol.right)
+            # make new symbol, ensure domain remains the same
+            new_symbol = symbol._binary_new_copy(new_left, new_right)
+            new_symbol.copy_domains(symbol)
+            return new_symbol
+
         # Unary operators
         elif isinstance(symbol, pybamm.UnaryOperator):
             new_child = self.process_symbol(symbol.child)
-            new_symbol = symbol.create_copy(new_children=[new_child])
+            new_symbol = symbol._unary_new_copy(new_child)
+            # ensure domain remains the same
+            new_symbol.copy_domains(symbol)
             # x_average can sometimes create a new symbol with electrode thickness
             # parameters, so we process again to make sure these parameters are set
             if isinstance(symbol, pybamm.XAverage) and not isinstance(
@@ -739,25 +629,17 @@ class ParameterValues:
             # f_a_dist in the size average needs to be processed
             if isinstance(new_symbol, pybamm.SizeAverage):
                 new_symbol.f_a_dist = self.process_symbol(new_symbol.f_a_dist)
-            # position in evaluate at needs to be processed, and should be a Scalar
-            if isinstance(new_symbol, pybamm.EvaluateAt):
-                new_symbol_position = self.process_symbol(new_symbol.position)
-                if not isinstance(new_symbol_position, pybamm.Scalar):
-                    raise ValueError(
-                        "'position' in 'EvaluateAt' must evaluate to a scalar"
-                    )
-                else:
-                    new_symbol.position = new_symbol_position
             return new_symbol
 
-        # Functions, BinaryOperators & Concatenations
-        elif (
-            isinstance(symbol, pybamm.Function)
-            or isinstance(symbol, pybamm.Concatenation)
-            or isinstance(symbol, pybamm.BinaryOperator)
-        ):
+        # Functions
+        elif isinstance(symbol, pybamm.Function):
             new_children = [self.process_symbol(child) for child in symbol.children]
-            return symbol.create_copy(new_children)
+            return symbol._function_new_copy(new_children)
+
+        # Concatenations
+        elif isinstance(symbol, pybamm.Concatenation):
+            new_children = [self.process_symbol(child) for child in symbol.children]
+            return symbol._concatenation_new_copy(new_children)
 
         # Variables: update scale
         elif isinstance(symbol, pybamm.Variable):
@@ -765,9 +647,7 @@ class ParameterValues:
             new_symbol._scale = self.process_symbol(symbol.scale)
             reference = self.process_symbol(symbol.reference)
             if isinstance(reference, pybamm.Vector):
-                # address numpy 1.25 deprecation warning: array should have ndim=0
-                # before conversion
-                reference = pybamm.Scalar((reference.evaluate()).item())
+                reference = pybamm.Scalar(float(reference.evaluate()))
             new_symbol._reference = reference
             new_symbol.bounds = tuple([self.process_symbol(b) for b in symbol.bounds])
             return new_symbol
@@ -779,7 +659,7 @@ class ParameterValues:
             # Backup option: return the object
             return symbol
 
-    def evaluate(self, symbol, inputs=None):
+    def evaluate(self, symbol):
         """
         Process and evaluate a symbol.
 
@@ -797,15 +677,7 @@ class ParameterValues:
         if processed_symbol.is_constant():
             return processed_symbol.evaluate()
         else:
-            # In the case that the only issue is an input parameter contained in inputs,
-            # go ahead and try and evaluate it with the inputs. If it doesn't work, raise
-            # the value error.
-            try:
-                return processed_symbol.evaluate(inputs=inputs)
-            except Exception as exc:
-                raise ValueError(
-                    "symbol must evaluate to a constant scalar or array"
-                ) from exc
+            raise ValueError("symbol must evaluate to a constant scalar or array")
 
     def _ipython_key_completions_(self):
         return list(self._dict_items.keys())
@@ -923,7 +795,7 @@ class ParameterValues:
         """
         # Get column width for pretty printing
         column_width = max(len(name) for name in evaluated_parameters.keys())
-        s = f"{{:>{column_width}}}"
+        s = "{{:>{}}}".format(column_width)
         with open(output_file, "w") as file:
             for name, value in sorted(evaluated_parameters.items()):
                 if 0.001 < abs(value) < 1000:

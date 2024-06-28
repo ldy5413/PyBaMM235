@@ -1,5 +1,4 @@
 import pybamm
-import numpy as np
 
 
 def graphite_diffusivity_Ecker2015(sto, T):
@@ -31,9 +30,9 @@ def graphite_diffusivity_Ecker2015(sto, T):
         Solid diffusivity
     """
 
-    D_ref = 8.4e-13 * np.exp(-11.3 * sto) + 8.2e-15
+    D_ref = 8.4e-13 * pybamm.exp(-11.3 * sto) + 8.2e-15
     E_D_s = 3.03e4
-    arrhenius = np.exp(-E_D_s / (pybamm.constants.R * T)) * np.exp(
+    arrhenius = pybamm.exp(-E_D_s / (pybamm.constants.R * T)) * pybamm.exp(
         E_D_s / (pybamm.constants.R * 296)
     )
 
@@ -89,12 +88,12 @@ def graphite_ocp_Ecker2015(sto):
     t = 0.196176
 
     u_eq = (
-        a * np.exp(-b * sto)
-        + c * np.exp(-d * (sto - e))
-        - r * np.tanh(s * (sto - t))
-        - g * np.tanh(h * (sto - i))
-        - j * np.tanh(k * (sto - m))
-        - n * np.exp(o * (sto - p))
+        a * pybamm.exp(-b * sto)
+        + c * pybamm.exp(-d * (sto - e))
+        - r * pybamm.tanh(s * (sto - t))
+        - g * pybamm.tanh(h * (sto - i))
+        - j * pybamm.tanh(k * (sto - m))
+        - n * pybamm.exp(o * (sto - p))
         + q
     )
 
@@ -143,11 +142,13 @@ def graphite_electrolyte_exchange_current_density_Ecker2015(c_e, c_s_surf, c_s_m
     )  # (A/m2)(m3/mol)**1.5 - includes ref concentrations
     E_r = 53400
 
-    arrhenius = np.exp(-E_r / (pybamm.constants.R * T)) * np.exp(
+    arrhenius = pybamm.exp(-E_r / (pybamm.constants.R * T)) * pybamm.exp(
         E_r / (pybamm.constants.R * 296.15)
     )
 
-    return m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    return (
+        m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    )
 
 
 def nco_diffusivity_Ecker2015(sto, T):
@@ -179,9 +180,9 @@ def nco_diffusivity_Ecker2015(sto, T):
         Solid diffusivity
     """
 
-    D_ref = 3.7e-13 - 3.4e-13 * np.exp(-12 * (sto - 0.62) * (sto - 0.62))
+    D_ref = 3.7e-13 - 3.4e-13 * pybamm.exp(-12 * (sto - 0.62) * (sto - 0.62))
     E_D_s = 8.06e4
-    arrhenius = np.exp(-E_D_s / (pybamm.constants.R * T)) * np.exp(
+    arrhenius = pybamm.exp(-E_D_s / (pybamm.constants.R * T)) * pybamm.exp(
         E_D_s / (pybamm.constants.R * 296.15)
     )
 
@@ -234,11 +235,11 @@ def nco_ocp_Ecker2015(sto):
 
     u_eq = (
         a * sto
-        - c * np.tanh(d * (sto - e))
-        - r * np.tanh(s * (sto - t))
-        - g * np.tanh(h * (sto - i))
-        - j * np.tanh(k * (sto - m))
-        - n * np.tanh(o * (sto - p))
+        - c * pybamm.tanh(d * (sto - e))
+        - r * pybamm.tanh(s * (sto - t))
+        - g * pybamm.tanh(h * (sto - i))
+        - j * pybamm.tanh(k * (sto - m))
+        - n * pybamm.tanh(o * (sto - p))
         + q
     )
     return u_eq
@@ -286,102 +287,13 @@ def nco_electrolyte_exchange_current_density_Ecker2015(c_e, c_s_surf, c_s_max, T
     )  # (A/m2)(m3/mol)**1.5 - includes ref concentrations
 
     E_r = 4.36e4
-    arrhenius = np.exp(-E_r / (pybamm.constants.R * T)) * np.exp(
+    arrhenius = pybamm.exp(-E_r / (pybamm.constants.R * T)) * pybamm.exp(
         E_r / (pybamm.constants.R * 296.15)
     )
 
-    return m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
-
-
-def plating_exchange_current_density_OKane2020(c_e, c_Li, T):
-    """
-    Exchange-current density for Li plating reaction [A.m-2].
-    References
-    ----------
-    .. [1] O’Kane, Simon EJ, Ian D. Campbell, Mohamed WJ Marzook, Gregory J. Offer, and
-    Monica Marinescu. "Physical origin of the differential voltage minimum associated
-    with lithium plating in Li-ion batteries." Journal of The Electrochemical Society
-    167, no. 9 (2020): 090540.
-    Parameters
-    ----------
-    c_e : :class:`pybamm.Symbol`
-        Electrolyte concentration [mol.m-3]
-    c_Li : :class:`pybamm.Symbol`
-        Plated lithium concentration [mol.m-3]
-    T : :class:`pybamm.Symbol`
-        Temperature [K]
-    Returns
-    -------
-    :class:`pybamm.Symbol`
-        Exchange-current density [A.m-2]
-    """
-
-    k_plating = pybamm.Parameter("Lithium plating kinetic rate constant [m.s-1]")
-
-    return pybamm.constants.F * k_plating * c_e
-
-
-def stripping_exchange_current_density_OKane2020(c_e, c_Li, T):
-    """
-    Exchange-current density for Li stripping reaction [A.m-2].
-
-    References
-    ----------
-
-    .. [1] O’Kane, Simon EJ, Ian D. Campbell, Mohamed WJ Marzook, Gregory J. Offer, and
-    Monica Marinescu. "Physical origin of the differential voltage minimum associated
-    with lithium plating in Li-ion batteries." Journal of The Electrochemical Society
-    167, no. 9 (2020): 090540.
-
-    Parameters
-    ----------
-
-    c_e : :class:`pybamm.Symbol`
-        Electrolyte concentration [mol.m-3]
-    c_Li : :class:`pybamm.Symbol`
-        Plated lithium concentration [mol.m-3]
-    T : :class:`pybamm.Symbol`
-        Temperature [K]
-
-    Returns
-    -------
-
-    :class:`pybamm.Symbol`
-        Exchange-current density [A.m-2]
-    """
-
-    k_plating = pybamm.Parameter("Lithium plating kinetic rate constant [m.s-1]")
-
-    return pybamm.constants.F * k_plating * c_Li
-
-
-def SEI_limited_dead_lithium_OKane2022(L_sei):
-    """
-    Decay rate for dead lithium formation [s-1].
-    References
-    ----------
-    .. [1] Simon E. J. O'Kane, Weilong Ai, Ganesh Madabattula, Diega Alonso-Alvarez,
-    Robert Timms, Valentin Sulzer, Jaqueline Sophie Edge, Billy Wu, Gregory J. Offer
-    and Monica Marinescu. "Lithium-ion battery degradation: how to model it."
-    Physical Chemistry: Chemical Physics 24, no. 13 (2022): 7909-7922.
-    Parameters
-    ----------
-    L_sei : :class:`pybamm.Symbol`
-        Total SEI thickness [m]
-    Returns
-    -------
-    :class:`pybamm.Symbol`
-        Dead lithium decay rate [s-1]
-    """
-
-    gamma_0 = pybamm.Parameter("Dead lithium decay constant [s-1]")
-    L_inner_0 = pybamm.Parameter("Initial inner SEI thickness [m]")
-    L_outer_0 = pybamm.Parameter("Initial outer SEI thickness [m]")
-    L_sei_0 = L_inner_0 + L_outer_0
-
-    gamma = gamma_0 * L_sei_0 / L_sei
-
-    return gamma
+    return (
+        m_ref * arrhenius * c_e**0.5 * c_s_surf**0.5 * (c_s_max - c_s_surf) ** 0.5
+    )
 
 
 def electrolyte_diffusivity_Ecker2015(c_e, T):
@@ -464,8 +376,8 @@ def electrolyte_conductivity_Ecker2015(c_e, T):
 
     # add temperature dependence
     E_k_e = 1.71e4
-    C = 296 * np.exp(E_k_e / (pybamm.constants.R * 296))
-    sigma_e = C * sigma_e_296 * np.exp(-E_k_e / (pybamm.constants.R * T)) / T
+    C = 296 * pybamm.exp(E_k_e / (pybamm.constants.R * 296))
+    sigma_e = C * sigma_e_296 * pybamm.exp(-E_k_e / (pybamm.constants.R * T)) / T
 
     return sigma_e
 
@@ -473,45 +385,69 @@ def electrolyte_conductivity_Ecker2015(c_e, T):
 # Call dict via a function to avoid errors when editing in place
 def get_parameter_values():
     """
-    Parameters for a Kokam SLPB 75106100 cell, from the papers :footcite:t:`Ecker2015i`
-    and :footcite:t:`Ecker2015ii`
+    Parameters for a Kokam SLPB 75106100 cell, from the papers
 
-    The tab placement parameters are taken from measurements in :footcite:t:`Hales2019`
+        Ecker, Madeleine, et al. "Parameterization of a physico-chemical model of a
+        lithium-ion battery I. determination of parameters." Journal of the
+        Electrochemical Society 162.9 (2015): A1836-A1848.
+
+        Ecker, Madeleine, et al. "Parameterization of a physico-chemical model of a
+        lithium-ion battery II. Model validation." Journal of The Electrochemical
+        Society 162.9 (2015): A1849-A1857.
+
+    The tab placement parameters are taken from measurements in
+
+        Hales, Alastair, et al. "The cell cooling coefficient: a standard to define heat
+        rejection from lithium-ion batteries." Journal of The Electrochemical Society
+        166.12 (2019): A2383.
 
     The thermal material properties are for a 5 Ah power pouch cell by Kokam. The data
-    are extracted from :footcite:t:`Zhao2018`
+    are extracted from
+
+        Zhao, Y., et al. "Modeling the effects of thermal gradients induced by tab and
+        surface cooling on lithium ion cell performance."" Journal of The
+        Electrochemical Society, 165.13 (2018): A3169-A3178.
 
     Graphite negative electrode parameters
     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     The fits to data for the electrode and electrolyte properties are those provided
-    by Dr. Simon O'Kane in the paper :footcite:t:`Richardson2020`
+    by Dr. Simon O'Kane in the paper:
 
-    SEI parameters are example parameters for SEI growth from the papers
-    :footcite:t:`Ramadass2004`, :footcite:t:`ploehn2004solvent`,
-    :footcite:t:`single2018identifying`, :footcite:t:`safari2008multimodal`, and
-    :footcite:t:`Yang2017`
+        Richardson, Giles, et. al. "Generalised single particle models for high-rate
+        operation of graded lithium-ion electrodes: Systematic derivation and
+        validation." Electrochemica Acta 339 (2020): 135862
 
-    .. note::
-        This parameter set does not claim to be representative of the true parameter
-        values. Instead these are parameter values that were used to fit SEI models to
-        observed experimental data in the referenced papers.
+    SEI parameters are example parameters for SEI growth from the papers:
+
+
+        Ramadass, P., Haran, B., Gomadam, P. M., White, R., & Popov, B. N. (2004).
+        Development of first principles capacity fade model for Li-ion cells. Journal of
+        the Electrochemical Society, 151(2), A196-A203.
+
+        Ploehn, H. J., Ramadass, P., & White, R. E. (2004). Solvent diffusion model for
+        aging of lithium-ion battery cells. Journal of The Electrochemical Society,
+        151(3), A456-A462.
+
+        Single, F., Latz, A., & Horstmann, B. (2018). Identifying the mechanism of
+        continued growth of the solid-electrolyte interphase. ChemSusChem, 11(12),
+        1950-1955.
+
+        Safari, M., Morcrette, M., Teyssot, A., & Delacour, C. (2009). Multimodal
+        Physics- Based Aging Model for Life Prediction of Li-Ion Batteries. Journal of
+        The Electrochemical Society, 156(3),
+
+        Yang, X., Leng, Y., Zhang, G., Ge, S., Wang, C. (2017). Modeling of lithium
+        plating induced aging of lithium-ion batteries: Transition from linear to
+        nonlinear aging. Journal of Power Sources, 360, 28-40.
+
+    Note: this parameter set does not claim to be representative of the true parameter
+    values. Instead these are parameter values that were used to fit SEI models to
+    observed experimental data in the referenced papers.
     """
 
     return {
         "chemistry": "lithium_ion",
-        # lithium plating
-        "Lithium metal partial molar volume [m3.mol-1]": 1.3e-05,
-        "Lithium plating kinetic rate constant [m.s-1]": 1e-10,
-        "Exchange-current density for plating [A.m-2]"
-        "": plating_exchange_current_density_OKane2020,
-        "Exchange-current density for stripping [A.m-2]"
-        "": stripping_exchange_current_density_OKane2020,
-        "Initial plated lithium concentration [mol.m-3]": 0.0,
-        "Typical plated lithium concentration [mol.m-3]": 1000.0,
-        "Lithium plating transfer coefficient": 0.5,
-        "Dead lithium decay constant [s-1]": 1e-06,
-        "Dead lithium decay rate [s-1]": SEI_limited_dead_lithium_OKane2022,
         # sei
         "Ratio of lithium moles to SEI moles": 2.0,
         "Inner SEI reaction proportion": 0.5,
@@ -565,7 +501,7 @@ def get_parameter_values():
         # negative electrode
         "Negative electrode conductivity [S.m-1]": 14.0,
         "Maximum concentration in negative electrode [mol.m-3]": 31920.0,
-        "Negative particle diffusivity [m2.s-1]": graphite_diffusivity_Ecker2015,
+        "Negative electrode diffusivity [m2.s-1]": graphite_diffusivity_Ecker2015,
         "Negative electrode OCP [V]": graphite_ocp_Ecker2015,
         "Negative electrode porosity": 0.329,
         "Negative electrode active material volume fraction": 0.372403,
@@ -581,7 +517,7 @@ def get_parameter_values():
         # positive electrode
         "Positive electrode conductivity [S.m-1]": 68.1,
         "Maximum concentration in positive electrode [mol.m-3]": 48580.0,
-        "Positive particle diffusivity [m2.s-1]": nco_diffusivity_Ecker2015,
+        "Positive electrode diffusivity [m2.s-1]": nco_diffusivity_Ecker2015,
         "Positive electrode OCP [V]": nco_ocp_Ecker2015,
         "Positive electrode porosity": 0.296,
         "Positive electrode active material volume fraction": 0.40832,
@@ -621,8 +557,6 @@ def get_parameter_values():
         "Number of cells connected in series to make a battery": 1.0,
         "Lower voltage cut-off [V]": 2.5,
         "Upper voltage cut-off [V]": 4.2,
-        "Open-circuit voltage at 0% SOC [V]": 2.5,
-        "Open-circuit voltage at 100% SOC [V]": 4.2,
         "Initial concentration in negative electrode [mol.m-3]": 26120.05,
         "Initial concentration in positive electrode [mol.m-3]": 12630.8,
         "Initial temperature [K]": 298.15,
@@ -633,6 +567,5 @@ def get_parameter_values():
             "Zhao2018",
             "Hales2019",
             "Richardson2020",
-            "OKane2020",
         ],
     }

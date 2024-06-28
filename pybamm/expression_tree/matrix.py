@@ -1,12 +1,10 @@
 #
 # Matrix class
 #
-from __future__ import annotations
 import numpy as np
 from scipy.sparse import csr_matrix, issparse
 
 import pybamm
-from pybamm.type_definitions import DomainType, AuxiliaryDomainType, DomainsType
 
 
 class Matrix(pybamm.Array):
@@ -16,17 +14,17 @@ class Matrix(pybamm.Array):
 
     def __init__(
         self,
-        entries: np.ndarray | list[float] | csr_matrix,
-        name: str | None = None,
-        domain: DomainType = None,
-        auxiliary_domains: AuxiliaryDomainType = None,
-        domains: DomainsType = None,
-        entries_string: str | None = None,
-    ) -> None:
+        entries,
+        name=None,
+        domain=None,
+        auxiliary_domains=None,
+        domains=None,
+        entries_string=None,
+    ):
         if isinstance(entries, list):
             entries = np.array(entries)
         if name is None:
-            name = f"Matrix {entries.shape!s}"
+            name = "Matrix {!s}".format(entries.shape)
             if issparse(entries):
                 name = "Sparse " + name
         # Convert all sparse matrices to csr

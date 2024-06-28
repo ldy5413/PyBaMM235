@@ -1,19 +1,12 @@
 #
 # Unary operator classes and methods
 #
-from __future__ import annotations
+import numbers
 
 import numpy as np
 from scipy.sparse import csr_matrix
-from typing import cast
 
 import pybamm
-from pybamm.type_definitions import (
-    DomainType,
-    AuxiliaryDomainType,
-    DomainsType,
-    Numeric,
-)
 
 
 class Broadcast(pybamm.SpatialOperator):
@@ -24,7 +17,7 @@ class Broadcast(pybamm.SpatialOperator):
 
     For an example of broadcasts in action, see
     `this example notebook
-    <https://github.com/pybamm-team/PyBaMM/blob/develop/docs/source/examples/notebooks/expression_tree/broadcasts.ipynb>`_
+    <https://github.com/pybamm-team/PyBaMM/blob/develop/examples/notebooks/expression_tree/broadcasts.ipynb>`_
 
     Parameters
     ----------
@@ -36,12 +29,7 @@ class Broadcast(pybamm.SpatialOperator):
         name of the node
     """
 
-    def __init__(
-        self,
-        child: pybamm.Symbol,
-        domains: dict[str, list[str] | str],
-        name: str | None = None,
-    ):
+    def __init__(self, child, domains, name=None):
         if name is None:
             name = "broadcast"
         super().__init__(name, child, domains=domains)
@@ -53,33 +41,9 @@ class Broadcast(pybamm.SpatialOperator):
         else:
             return False
 
-    def _sympy_operator(self, child: pybamm.Symbol):
+    def _sympy_operator(self, child):
         """Override :meth:`pybamm.UnaryOperator._sympy_operator`"""
         return child
-
-    def _diff(self, variable):
-        """See :meth:`pybamm.Symbol._diff()`."""
-        # Differentiate the child and broadcast the result in the same way
-        return self._unary_new_copy(self.child.diff(variable))
-
-    def reduce_one_dimension(self):  # pragma: no cover
-        """Reduce the broadcast by one dimension."""
-        raise NotImplementedError
-
-    def to_json(self):
-        raise NotImplementedError(
-            "pybamm.Broadcast: Serialisation is only implemented for discretised models"
-        )
-
-    @classmethod
-    def _from_json(cls, snippet):
-        raise NotImplementedError(
-            "pybamm.Broadcast: Please use a discretised model when reading in from JSON"
-        )
-
-    def _unary_new_copy(self, child: pybamm.Symbol, perform_simplifications=True):
-        """See :meth:`pybamm.UnaryOperator._unary_new_copy()`."""
-        return self.__class__(child, self.broadcast_domain)
 
 
 class PrimaryBroadcast(Broadcast):
@@ -93,7 +57,7 @@ class PrimaryBroadcast(Broadcast):
 
     Parameters
     ----------
-    child : :class:`Symbol`, numeric
+    child : :class:`Symbol`
         child node
     broadcast_domain : iterable of str
         Primary domain for broadcast. This will become the domain of the symbol
@@ -101,19 +65,10 @@ class PrimaryBroadcast(Broadcast):
         name of the node
     """
 
-    def __init__(
-        self,
-        child: Numeric | pybamm.Symbol,
-        broadcast_domain: list[str] | str,
-        name: str | None = None,
-    ):
+    def __init__(self, child, broadcast_domain, name=None):
         # Convert child to scalar if it is a number
-        if isinstance(child, (float, int, np.number)):
+        if isinstance(child, numbers.Number):
             child = pybamm.Scalar(child)
-
-        # cast child to Symbol for mypy
-        child = cast(pybamm.Symbol, child)
-
         # Convert domain to list if it's a string
         if isinstance(broadcast_domain, str):
             broadcast_domain = [broadcast_domain]
@@ -123,7 +78,7 @@ class PrimaryBroadcast(Broadcast):
         self.broadcast_type = "primary to nodes"
         super().__init__(child, domains, name=name)
 
-    def check_and_set_domains(self, child: pybamm.Symbol, broadcast_domain: list[str]):
+    def check_and_set_domains(self, child, broadcast_domain):
         """See :meth:`Broadcast.check_and_set_domains`"""
         # Can only do primary broadcast from current collector to electrode,
         # particle-size or particle or from electrode to particle-size or particle.
@@ -178,6 +133,10 @@ class PrimaryBroadcast(Broadcast):
 
         return domains
 
+    def _unary_new_copy(self, child):
+        """See :meth:`pybamm.UnaryOperator._unary_new_copy()`."""
+        return self.__class__(child, self.broadcast_domain)
+
     def _evaluate_for_shape(self):
         """
         Returns a vector of NaNs to represent the shape of a Broadcast.
@@ -195,12 +154,7 @@ class PrimaryBroadcast(Broadcast):
 class PrimaryBroadcastToEdges(PrimaryBroadcast):
     """A primary broadcast onto the edges of the domain."""
 
-    def __init__(
-        self,
-        child: Numeric | pybamm.Symbol,
-        broadcast_domain: list[str] | str,
-        name: str | None = None,
-    ):
+    def __init__(self, child, broadcast_domain, name=None):
         name = name or "broadcast to edges"
         super().__init__(child, broadcast_domain, name)
         self.broadcast_type = "primary to edges"
@@ -231,12 +185,7 @@ class SecondaryBroadcast(Broadcast):
         name of the node
     """
 
-    def __init__(
-        self,
-        child: pybamm.Symbol,
-        broadcast_domain: list[str] | str,
-        name: str | None = None,
-    ):
+    def __init__(self, child, broadcast_domain, name=None):
         # Convert domain to list if it's a string
         if isinstance(broadcast_domain, str):
             broadcast_domain = [broadcast_domain]
@@ -246,7 +195,7 @@ class SecondaryBroadcast(Broadcast):
         self.broadcast_type = "secondary to nodes"
         super().__init__(child, domains, name=name)
 
-    def check_and_set_domains(self, child: pybamm.Symbol, broadcast_domain: list[str]):
+    def check_and_set_domains(self, child, broadcast_domain):
         """See :meth:`Broadcast.check_and_set_domains`"""
         if child.domain == []:
             raise TypeError(
@@ -308,6 +257,10 @@ class SecondaryBroadcast(Broadcast):
 
         return domains
 
+    def _unary_new_copy(self, child):
+        """See :meth:`pybamm.UnaryOperator._unary_new_copy()`."""
+        return SecondaryBroadcast(child, self.broadcast_domain)
+
     def _evaluate_for_shape(self):
         """
         Returns a vector of NaNs to represent the shape of a Broadcast.
@@ -325,12 +278,7 @@ class SecondaryBroadcast(Broadcast):
 class SecondaryBroadcastToEdges(SecondaryBroadcast):
     """A secondary broadcast onto the edges of a domain."""
 
-    def __init__(
-        self,
-        child: pybamm.Symbol,
-        broadcast_domain: list[str] | str,
-        name: str | None = None,
-    ):
+    def __init__(self, child, broadcast_domain, name=None):
         name = name or "broadcast to edges"
         super().__init__(child, broadcast_domain, name)
         self.broadcast_type = "secondary to edges"
@@ -361,12 +309,7 @@ class TertiaryBroadcast(Broadcast):
         name of the node
     """
 
-    def __init__(
-        self,
-        child: pybamm.Symbol,
-        broadcast_domain: list[str] | str,
-        name: str | None = None,
-    ):
+    def __init__(self, child, broadcast_domain, name=None):
         # Convert domain to list if it's a string
         if isinstance(broadcast_domain, str):
             broadcast_domain = [broadcast_domain]
@@ -376,9 +319,7 @@ class TertiaryBroadcast(Broadcast):
         self.broadcast_type = "tertiary to nodes"
         super().__init__(child, domains, name=name)
 
-    def check_and_set_domains(
-        self, child: pybamm.Symbol, broadcast_domain: list[str] | str
-    ):
+    def check_and_set_domains(self, child, broadcast_domain):
         """See :meth:`Broadcast.check_and_set_domains`"""
         if child.domains["secondary"] == []:
             raise TypeError(
@@ -425,6 +366,10 @@ class TertiaryBroadcast(Broadcast):
 
         return domains
 
+    def _unary_new_copy(self, child):
+        """See :meth:`pybamm.UnaryOperator._unary_new_copy()`."""
+        return self.__class__(child, self.broadcast_domain)
+
     def _evaluate_for_shape(self):
         """
         Returns a vector of NaNs to represent the shape of a Broadcast.
@@ -442,12 +387,7 @@ class TertiaryBroadcast(Broadcast):
 class TertiaryBroadcastToEdges(TertiaryBroadcast):
     """A tertiary broadcast onto the edges of a domain."""
 
-    def __init__(
-        self,
-        child: pybamm.Symbol,
-        broadcast_domain: list[str] | str,
-        name: str | None = None,
-    ):
+    def __init__(self, child, broadcast_domain, name=None):
         name = name or "broadcast to edges"
         super().__init__(child, broadcast_domain, name)
         self.broadcast_type = "tertiary to edges"
@@ -461,17 +401,15 @@ class FullBroadcast(Broadcast):
 
     def __init__(
         self,
-        child_input: Numeric | pybamm.Symbol,
-        broadcast_domain: DomainType = None,
-        auxiliary_domains: AuxiliaryDomainType = None,
-        broadcast_domains: DomainsType = None,
-        name: str | None = None,
+        child,
+        broadcast_domain=None,
+        auxiliary_domains=None,
+        broadcast_domains=None,
+        name=None,
     ):
         # Convert child to scalar if it is a number
-        if isinstance(child_input, (float, int, np.number)):
-            child: pybamm.Scalar = pybamm.Scalar(child_input)
-        else:
-            child: pybamm.Symbol = child_input  # type: ignore[no-redef]
+        if isinstance(child, numbers.Number):
+            child = pybamm.Scalar(child)
 
         if isinstance(auxiliary_domains, str):
             auxiliary_domains = {"secondary": auxiliary_domains}
@@ -484,7 +422,7 @@ class FullBroadcast(Broadcast):
         self.broadcast_type = "full to nodes"
         super().__init__(child, domains, name=name)
 
-    def check_and_set_domains(self, child: pybamm.Symbol, broadcast_domains: dict):
+    def check_and_set_domains(self, child, broadcast_domains):
         """See :meth:`Broadcast.check_and_set_domains`"""
         if broadcast_domains["primary"] == []:
             raise pybamm.DomainError(
@@ -498,7 +436,7 @@ class FullBroadcast(Broadcast):
 
         return broadcast_domains
 
-    def _unary_new_copy(self, child, perform_simplifications=True):
+    def _unary_new_copy(self, child):
         """See :meth:`pybamm.UnaryOperator._unary_new_copy()`."""
         return self.__class__(child, broadcast_domains=self.domains)
 
@@ -535,11 +473,11 @@ class FullBroadcastToEdges(FullBroadcast):
 
     def __init__(
         self,
-        child: Numeric | pybamm.Symbol,
-        broadcast_domain: DomainType = None,
-        auxiliary_domains: AuxiliaryDomainType = None,
-        broadcast_domains: DomainsType = None,
-        name: str | None = None,
+        child,
+        broadcast_domain=None,
+        auxiliary_domains=None,
+        broadcast_domains=None,
+        name=None,
     ):
         name = name or "broadcast to edges"
         super().__init__(
@@ -566,7 +504,7 @@ class FullBroadcastToEdges(FullBroadcast):
             )
 
 
-def full_like(symbols: tuple[pybamm.Symbol, ...], fill_value: float) -> pybamm.Symbol:
+def full_like(symbols, fill_value):
     """
     Returns an array with the same shape and domains as the sum of the
     input symbols, with a constant value given by `fill_value`.
@@ -589,24 +527,22 @@ def full_like(symbols: tuple[pybamm.Symbol, ...], fill_value: float) -> pybamm.S
         return pybamm.Scalar(fill_value)
     try:
         shape = sum_symbol.shape
-
+        # use vector or matrix
+        if shape[1] == 1:
+            array_type = pybamm.Vector
+        else:
+            array_type = pybamm.Matrix
         # return dense array, except for a matrix of zeros
         if shape[1] != 1 and fill_value == 0:
             entries = csr_matrix(shape)
         else:
             entries = fill_value * np.ones(shape)
 
-        # use vector or matrix
-        if shape[1] == 1:
-            return pybamm.Vector(entries, domains=sum_symbol.domains)
-        else:
-            return pybamm.Matrix(entries, domains=sum_symbol.domains)
+        return array_type(entries, domains=sum_symbol.domains)
 
     except NotImplementedError:
-        if (
-            sum_symbol.shape_for_testing == (1, 1)
-            or sum_symbol.shape_for_testing == (1,)
-            or sum_symbol.domain == []
+        if sum_symbol.shape_for_testing == (1, 1) or sum_symbol.shape_for_testing == (
+            1,
         ):
             return pybamm.Scalar(fill_value)
         if sum_symbol.evaluates_on_edges("primary"):
@@ -617,7 +553,7 @@ def full_like(symbols: tuple[pybamm.Symbol, ...], fill_value: float) -> pybamm.S
             return FullBroadcast(fill_value, broadcast_domains=sum_symbol.domains)
 
 
-def zeros_like(*symbols: pybamm.Symbol):
+def zeros_like(*symbols):
     """
     Returns an array with the same shape and domains as the sum of the
     input symbols, with each entry equal to zero.
@@ -630,7 +566,7 @@ def zeros_like(*symbols: pybamm.Symbol):
     return full_like(symbols, 0)
 
 
-def ones_like(*symbols: pybamm.Symbol):
+def ones_like(*symbols):
     """
     Returns an array with the same shape and domains as the sum of the
     input symbols, with each entry equal to one.

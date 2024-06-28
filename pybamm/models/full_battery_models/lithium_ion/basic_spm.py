@@ -6,8 +6,7 @@ from .base_lithium_ion_model import BaseModel
 
 
 class BasicSPM(BaseModel):
-    """Single Particle Model (SPM) model of a lithium-ion battery, from
-    :footcite:t:`Marquis2019`.
+    """Single Particle Model (SPM) model of a lithium-ion battery, from [2]_.
 
     This class differs from the :class:`pybamm.lithium_ion.SPM` model class in that it
     shows the whole model in a single class. This comes at the cost of flexibility in
@@ -18,6 +17,12 @@ class BasicSPM(BaseModel):
     ----------
     name : str, optional
         The name of the model.
+
+    References
+    ----------
+    .. [2] SG Marquis, V Sulzer, R Timms, CP Please and SJ Chapman. “An asymptotic
+           derivation of a single particle model with electrolyte”. Journal of The
+           Electrochemical Society, 166(15):A3693–A3706, 2019
     """
 
     def __init__(self, name="Single Particle Model"):
@@ -86,14 +91,14 @@ class BasicSPM(BaseModel):
         self.boundary_conditions[c_s_n] = {
             "left": (pybamm.Scalar(0), "Neumann"),
             "right": (
-                -j_n / (param.F * pybamm.surf(param.n.prim.D(c_s_n, T))),
+                -j_n / param.F / param.n.prim.D(c_s_surf_n, T),
                 "Neumann",
             ),
         }
         self.boundary_conditions[c_s_p] = {
             "left": (pybamm.Scalar(0), "Neumann"),
             "right": (
-                -j_p / (param.F * pybamm.surf(param.p.prim.D(c_s_p, T))),
+                -j_p / param.F / param.p.prim.D(c_s_surf_p, T),
                 "Neumann",
             ),
         }
@@ -139,9 +144,6 @@ class BasicSPM(BaseModel):
         phi_e = -eta_n - param.n.prim.U(sto_surf_n, T)
         phi_s_p = eta_p + phi_e + param.p.prim.U(sto_surf_p, T)
         V = phi_s_p
-        num_cells = pybamm.Parameter(
-            "Number of cells connected in series to make a battery"
-        )
 
         whole_cell = ["negative electrode", "separator", "positive electrode"]
         # The `variables` dictionary contains all variables that might be useful for
@@ -149,9 +151,7 @@ class BasicSPM(BaseModel):
         # Primary broadcasts are used to broadcast scalar quantities across a domain
         # into a vector of the right shape, for multiplying with other vectors
         self.variables = {
-            "Time [s]": pybamm.t,
             "Discharge capacity [A.h]": Q,
-            "X-averaged negative particle concentration [mol.m-3]": c_s_n,
             "Negative particle surface "
             "concentration [mol.m-3]": pybamm.PrimaryBroadcast(
                 c_s_surf_n, "negative electrode"
@@ -159,13 +159,11 @@ class BasicSPM(BaseModel):
             "Electrolyte concentration [mol.m-3]": pybamm.PrimaryBroadcast(
                 param.c_e_init_av, whole_cell
             ),
-            "X-averaged positive particle concentration [mol.m-3]": c_s_p,
             "Positive particle surface "
             "concentration [mol.m-3]": pybamm.PrimaryBroadcast(
                 c_s_surf_p, "positive electrode"
             ),
             "Current [A]": I,
-            "Current variable [A]": I,  # for compatibility with pybamm.Experiment
             "Negative electrode potential [V]": pybamm.PrimaryBroadcast(
                 phi_s_n, "negative electrode"
             ),
@@ -174,9 +172,7 @@ class BasicSPM(BaseModel):
                 phi_s_p, "positive electrode"
             ),
             "Voltage [V]": V,
-            "Battery voltage [V]": V * num_cells,
         }
-        # Events specify points at which a solution should terminate
         self.events += [
             pybamm.Event("Minimum voltage [V]", V - param.voltage_low_cut),
             pybamm.Event("Maximum voltage [V]", param.voltage_high_cut - V),

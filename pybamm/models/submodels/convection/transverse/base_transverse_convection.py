@@ -2,7 +2,7 @@
 # Base class for convection submodels in transverse directions
 #
 import pybamm
-from pybamm.models.submodels.convection.base_convection import BaseModel
+from ..base_convection import BaseModel
 
 
 class BaseTransverseModel(BaseModel):

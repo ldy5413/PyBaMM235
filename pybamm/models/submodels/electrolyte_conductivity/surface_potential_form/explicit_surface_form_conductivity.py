@@ -2,9 +2,7 @@
 # Class for explicit surface form potentials
 #
 import pybamm
-from pybamm.models.submodels.electrolyte_conductivity.base_electrolyte_conductivity import (
-    BaseElectrolyteConductivity,
-)
+from ..base_electrolyte_conductivity import BaseElectrolyteConductivity
 
 
 class Explicit(BaseElectrolyteConductivity):

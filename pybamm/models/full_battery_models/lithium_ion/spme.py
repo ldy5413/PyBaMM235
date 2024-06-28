@@ -8,16 +8,21 @@ from .spm import SPM
 class SPMe(SPM):
     """
     Single Particle Model with Electrolyte (SPMe) of a lithium-ion battery, from
-    :footcite:t:`Marquis2019`. Inherits most submodels from SPM, only modifies
-    potentials and electrolyte. See :class:`pybamm.lithium_ion.BaseModel` for more
-    details.
+    [1]_. Inherits most submodels from SPM, only modifies potentials and electrolyte.
+    See :class:`pybamm.lithium_ion.BaseModel` for more details.
 
     Examples
     --------
+    >>> import pybamm
     >>> model = pybamm.lithium_ion.SPMe()
     >>> model.name
     'Single Particle Model with electrolyte'
 
+    References
+    ----------
+    .. [1] SG Marquis, V Sulzer, R Timms, CP Please and SJ Chapman. “An asymptotic
+           derivation of a single particle model with electrolyte”. Journal of The
+           Electrochemical Society, 166(15):A3693–A3706, 2019
     """
 
     def __init__(
@@ -56,16 +61,16 @@ class SPMe(SPM):
             or self.options.electrode_types["negative"] == "planar"
         ):
             if self.options["electrolyte conductivity"] in ["default", "composite"]:
-                self.submodels["electrolyte conductivity"] = (
-                    pybamm.electrolyte_conductivity.Composite(
-                        self.param, options=self.options
-                    )
+                self.submodels[
+                    "electrolyte conductivity"
+                ] = pybamm.electrolyte_conductivity.Composite(
+                    self.param, options=self.options
                 )
             elif self.options["electrolyte conductivity"] == "integrated":
-                self.submodels["electrolyte conductivity"] = (
-                    pybamm.electrolyte_conductivity.Integrated(
-                        self.param, options=self.options
-                    )
+                self.submodels[
+                    "electrolyte conductivity"
+                ] = pybamm.electrolyte_conductivity.Integrated(
+                    self.param, options=self.options
                 )
         if self.options["surface form"] == "false":
             surf_model = surf_form.Explicit
@@ -76,6 +81,6 @@ class SPMe(SPM):
 
         for domain in ["negative", "positive"]:
             if self.options.electrode_types[domain] == "porous":
-                self.submodels[f"{domain} surface potential difference [V]"] = (
-                    surf_model(self.param, domain, self.options)
-                )
+                self.submodels[
+                    f"{domain} surface potential difference [V]"
+                ] = surf_model(self.param, domain, self.options)

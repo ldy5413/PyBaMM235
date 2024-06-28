@@ -1,11 +1,9 @@
 #
 # Interpolating class
 #
-from __future__ import annotations
 import numpy as np
 from scipy import interpolate
-from collections.abc import Sequence
-import numbers
+import warnings
 
 import pybamm
 
@@ -43,18 +41,25 @@ class Interpolant(pybamm.Function):
 
     def __init__(
         self,
-        x: np.ndarray | Sequence[np.ndarray],
-        y: np.ndarray,
-        children: Sequence[pybamm.Symbol] | pybamm.Time,
-        name: str | None = None,
-        interpolator: str | None = "linear",
-        extrapolate: bool = True,
-        entries_string: str | None = None,
-        _num_derivatives: int = 0,
+        x,
+        y,
+        children,
+        name=None,
+        interpolator="linear",
+        extrapolate=True,
+        entries_string=None,
     ):
+        # "cubic spline" has been renamed to "cubic"
+        if interpolator == "cubic spline":
+            interpolator = "cubic"
+            warnings.warn(
+                "The 'cubic spline' interpolator has been renamed to 'cubic'.",
+                DeprecationWarning,
+            )
+
         # Check interpolator is valid
         if interpolator not in ["linear", "cubic", "pchip"]:
-            raise ValueError(f"interpolator '{interpolator}' not recognised")
+            raise ValueError("interpolator '{}' not recognised".format(interpolator))
 
         # Perform some checks on the data
         if isinstance(x, (tuple, list)) and len(x) == 2:
@@ -96,15 +101,15 @@ class Interpolant(pybamm.Function):
                 x1 = x[0]
             else:
                 x1 = x
-                x: list[np.ndarray] = [x]  # type: ignore[no-redef]
+                x = [x]
             x2 = None
             if x1.shape[0] != y.shape[0]:
                 raise ValueError(
                     "len(x1) should equal y=shape[0], "
                     f"but x1.shape={x1.shape} and y.shape={y.shape}"
                 )
-        # children should be a list not a symbol or a number
-        if isinstance(children, (pybamm.Symbol, numbers.Number)):
+        # children should be a list not a symbol
+        if isinstance(children, pybamm.Symbol):
             children = [children]
         # Either a single x is provided and there is one child
         # or x is a 2-tuple and there are two children
@@ -122,15 +127,14 @@ class Interpolant(pybamm.Function):
             self.dimension = 1
             if interpolator == "linear":
                 if extrapolate is False:
-                    fill_value_1: float | str = np.nan
+                    fill_value = np.nan
                 elif extrapolate is True:
-                    fill_value_1 = "extrapolate"
+                    fill_value = "extrapolate"
                 interpolating_function = interpolate.interp1d(
                     x1,
-                    y,
+                    y.T,
                     bounds_error=False,
-                    fill_value=fill_value_1,
-                    axis=0,
+                    fill_value=fill_value,
                 )
             elif interpolator == "cubic":
                 interpolating_function = interpolate.CubicSpline(
@@ -182,7 +186,7 @@ class Interpolant(pybamm.Function):
                     fill_value=fill_value,
                 )
         else:
-            raise ValueError(f"Invalid dimension of x: {len(x)}")
+            raise ValueError("Invalid dimension of x: {0}".format(len(x)))
 
         # Set name
         if name is None:
@@ -190,36 +194,13 @@ class Interpolant(pybamm.Function):
         self.x = x
         self.y = y
         self.entries_string = entries_string
-
-        # Differentiate the interpolating function if necessary
-        self._num_derivatives = _num_derivatives
-        for _ in range(_num_derivatives):
-            interpolating_function = interpolating_function.derivative()
-
-        super().__init__(interpolating_function, *children, name=name)
+        super().__init__(
+            interpolating_function, *children, name=name, derivative="derivative"
+        )
 
         # Store information as attributes
         self.interpolator = interpolator
         self.extrapolate = extrapolate
-
-    @classmethod
-    def _from_json(cls, snippet: dict):
-        """Create an Interpolant object from JSON data"""
-
-        x1 = []
-
-        if len(snippet["x"]) == 1:
-            x1 = [np.array(x) for x in snippet["x"]]
-
-        return cls(
-            x1 if x1 else tuple(np.array(x) for x in snippet["x"]),
-            np.array(snippet["y"]),
-            snippet["children"],
-            name=snippet["name"],
-            interpolator=snippet["interpolator"],
-            extrapolate=snippet["extrapolate"],
-            _num_derivatives=snippet["_num_derivatives"],
-        )
 
     @property
     def entries_string(self):
@@ -241,20 +222,13 @@ class Interpolant(pybamm.Function):
     def set_id(self):
         """See :meth:`pybamm.Symbol.set_id()`."""
         self._id = hash(
-            (
-                self.__class__,
-                self.name,
-                self.entries_string,
-                *tuple([child.id for child in self.children]),
-                *tuple(self.domain),
-                self._num_derivatives,
-            )
+            (self.__class__, self.name, self.entries_string)
+            + tuple([child.id for child in self.children])
+            + tuple(self.domain)
         )
 
-    def create_copy(self, new_children=None, perform_simplifications=True):
-        """See :meth:`pybamm.Symbol.new_copy()`."""
-        children = self._children_for_copying(new_children)
-
+    def _function_new_copy(self, children):
+        """See :meth:`Function._function_new_copy()`"""
         return pybamm.Interpolant(
             self.x,
             self.y,
@@ -263,7 +237,6 @@ class Interpolant(pybamm.Function):
             interpolator=self.interpolator,
             extrapolate=self.extrapolate,
             entries_string=self.entries_string,
-            _num_derivatives=self._num_derivatives,
         )
 
     def _function_evaluate(self, evaluated_children):
@@ -310,49 +283,10 @@ class Interpolant(pybamm.Function):
                     new_evaluated_children, self.function.grid
                 ):
                     nan_children.append(np.ones_like(child) * interp_range.mean())
-                nan_eval = self.function(np.transpose(nan_children))
-                return np.reshape(nan_eval, shape)
+                return self.function(np.transpose(nan_children)) * np.nan
             else:
                 res = self.function(np.transpose(new_evaluated_children))
-                return np.reshape(res, shape)
+                return res[:, np.newaxis]
 
         else:  # pragma: no cover
-            raise ValueError(f"Invalid dimension: {self.dimension}")
-
-    def _function_diff(self, children: Sequence[pybamm.Symbol], idx: float):
-        """
-        Derivative with respect to child number 'idx'.
-        See :meth:`pybamm.Symbol._diff()`.
-        """
-        if len(children) > 1:
-            raise NotImplementedError(
-                "differentiation not implemented for functions with more than one child"
-            )
-        else:
-            # keep using "derivative" as derivative
-            return Interpolant(
-                self.x,
-                self.y,
-                children,
-                name=self.name,
-                interpolator=self.interpolator,
-                extrapolate=self.extrapolate,
-                _num_derivatives=self._num_derivatives + 1,
-            )
-
-    def to_json(self):
-        """
-        Method to serialise an Interpolant object into JSON.
-        """
-
-        json_dict = {
-            "name": self.name,
-            "id": self.id,
-            "x": [x_item.tolist() for x_item in self.x],
-            "y": self.y.tolist(),
-            "interpolator": self.interpolator,
-            "extrapolate": self.extrapolate,
-            "_num_derivatives": self._num_derivatives,
-        }
-
-        return json_dict
+            raise ValueError("Invalid dimension: {0}".format(self.dimension))

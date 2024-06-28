@@ -1,4 +1,8 @@
+#
+# Functions to process parameter data (for Interpolants)
+#
 import os
+import pandas as pd
 import json
 import numpy as np
 
@@ -35,12 +39,11 @@ def process_1D_data(name, path=None):
     """
     filename, name = _process_name(name, path, ".csv")
 
-    data = np.genfromtxt(filename, delimiter=",", skip_header=1)
-    x = data[:, 0]
-    y = data[:, 1]
-
+    data = pd.read_csv(
+        filename, comment="#", skip_blank_lines=True, header=None
+    ).to_numpy()
     # Save name and data
-    return (name, ([x], y))
+    return (name, ([data[:, 0]], data[:, 1]))
 
 
 def process_2D_data(name, path=None):
@@ -49,7 +52,7 @@ def process_2D_data(name, path=None):
     """
     filename, name = _process_name(name, path, ".json")
 
-    with open(filename) as jsonfile:
+    with open(filename, "r") as jsonfile:
         json_data = json.load(jsonfile)
     data = json_data["data"]
     data[0] = [np.array(el) for el in data[0]]
@@ -88,16 +91,23 @@ def process_2D_data_csv(name, path=None):
 
     filename, name = _process_name(name, path, ".csv")
 
-    data = np.genfromtxt(filename, delimiter=",", skip_header=1)
+    df = pd.read_csv(filename)
 
-    x1 = np.unique(data[:, 0])
-    x2 = np.unique(data[:, 1])
+    x1 = np.array(list(set(df.iloc[:, 0])))
+    x2 = np.array(list(set(df.iloc[:, 1])))
 
-    value = data[:, 2]
+    value = df.iloc[:, 2].to_numpy()
+
+    x1.sort()
+    x2.sort()
 
     x = (x1, x2)
 
-    value_data = value.reshape(len(x1), len(x2), order="C")
+    value_data = np.reshape(
+        value,
+        (len(x1), len(x2)),
+        order="C",  # use the C convention
+    )
 
     formatted_data = (name, (x, value_data))
 
@@ -135,17 +145,25 @@ def process_3D_data_csv(name, path=None):
 
     filename, name = _process_name(name, path, ".csv")
 
-    data = np.genfromtxt(filename, delimiter=",", skip_header=1)
+    df = pd.read_csv(filename)
 
-    x1 = np.unique(data[:, 0])
-    x2 = np.unique(data[:, 1])
-    x3 = np.unique(data[:, 2])
+    x1 = np.array(list(set(df.iloc[:, 0])))
+    x2 = np.array(list(set(df.iloc[:, 1])))
+    x3 = np.array(list(set(df.iloc[:, 2])))
 
-    value = data[:, 3]
+    value = df.iloc[:, 3].to_numpy()
+
+    x1.sort()
+    x2.sort()
+    x3.sort()
 
     x = (x1, x2, x3)
 
-    value_data = value.reshape(len(x1), len(x2), len(x3), order="C")
+    value_data = np.reshape(
+        value,
+        (len(x1), len(x2), len(x3)),
+        order="C",
+    )
 
     formatted_data = (name, (x, value_data))
 

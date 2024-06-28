@@ -43,7 +43,14 @@ class Marcus(BaseKinetics):
 class MarcusHushChidsey(BaseKinetics):
     """
     Submodel which implements asymptotic Marcus-Hush-Chidsey kinetics, as derived in
-    :footcite:t:`Sripad2020`
+    [1]_.
+
+    References
+    ----------
+    .. [1] Sripad, S., Korff, D., DeCaluwe, S. C., & Viswanathan, V. (2020). "Kinetics
+           of lithium electrodeposition and stripping".
+           [The Journal of Chemical Physics](https://doi.org/10.1063/5.0023771),
+           153(19), 194701.
 
     Parameters
     ----------

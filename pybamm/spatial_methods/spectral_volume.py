@@ -77,7 +77,7 @@ class SpectralVolume(pybamm.FiniteVolume):
     def cv_boundary_reconstruction_sub_matrix(self):
         """
         Coefficients for reconstruction of a function through averages.
-        The resulting matrix is scale-invariant :footcite:t:`Wang2002`.
+        The resulting matrix is scale-invariant [2]_.
 
         Parameters
         ----------
@@ -85,6 +85,13 @@ class SpectralVolume(pybamm.FiniteVolume):
         Returns
         -------
 
+        References
+        ----------
+        .. [2] Z. J. Wang.
+               “Spectral (Finite) Volume Method for Conservation Laws
+               on Unstructured Grids”.
+               Journal of Computational Physics,
+               178:210–251, 2002
         """
 
         # While Spectral Volume in general may use any point
@@ -175,8 +182,7 @@ class SpectralVolume(pybamm.FiniteVolume):
 
     def chebyshev_differentiation_matrices(self, noe, dod):
         """
-        Chebyshev differentiation matrices, from
-        :footcite:t:`baltensperger2003spectral`.
+        Chebyshev differentiation matrices [1]_.
 
         Parameters
         ----------
@@ -195,6 +201,13 @@ class SpectralVolume(pybamm.FiniteVolume):
             matrix of order p would just be the pth matrix power of
             the diff. matrix of order 1. This method computes the higher
             orders in a more numerically stable way.
+
+        References
+        ----------
+        .. [1] Richard Baltensperger and Manfred R. Trummer.
+               “Spectral Differencing With A Twist”.
+               Society for Industrial and Applied Mathematics,
+               24(5):1465–1487, 2003
         """
         if dod >= noe:
             raise ValueError(
@@ -342,12 +355,12 @@ class SpectralVolume(pybamm.FiniteVolume):
                 sub_matrix[i * d, i * (d + 1) : (i + 1) * (d + 1)] = (
                     f * sub_matrix_raw[i * (d + 1), i * (d + 1) : (i + 1) * (d + 1)]
                 )
-                sub_matrix[i * d + 1 : (i + 1) * d, i * (d + 1) : (i + 1) * (d + 1)] = (
-                    sub_matrix_raw[
-                        i * (d + 1) + 1 : (i + 1) * (d + 1) - 1,
-                        i * (d + 1) : (i + 1) * (d + 1),
-                    ]
-                )
+                sub_matrix[
+                    i * d + 1 : (i + 1) * d, i * (d + 1) : (i + 1) * (d + 1)
+                ] = sub_matrix_raw[
+                    i * (d + 1) + 1 : (i + 1) * (d + 1) - 1,
+                    i * (d + 1) : (i + 1) * (d + 1),
+                ]
                 sub_matrix[(i + 1) * d, i * (d + 1) : (i + 1) * (d + 1)] = (
                     f * sub_matrix_raw[i * (d + 1) + d, i * (d + 1) : (i + 1) * (d + 1)]
                 )
@@ -391,11 +404,7 @@ class SpectralVolume(pybamm.FiniteVolume):
         e = np.zeros(n - 1)
         e[d - 1 :: d] = 1 / submesh.d_nodes[d - 1 :: d]
         sub_matrix = vstack(
-            [
-                np.zeros((1, n)),
-                diags([-e, e], [0, 1], shape=(n - 1, n)),
-                np.zeros((1, n)),
-            ]
+            [np.zeros(n), diags([-e, e], [0, 1], shape=(n - 1, n)), np.zeros(n)]
         )
 
         # number of repeats
@@ -531,7 +540,8 @@ class SpectralVolume(pybamm.FiniteVolume):
             lbc_vector = pybamm.Vector(np.zeros(n * second_dim_repeats))
         else:
             raise ValueError(
-                "boundary condition must be Dirichlet or Neumann, " f"not '{lbc_type}'"
+                "boundary condition must be Dirichlet or Neumann, "
+                "not '{}'".format(lbc_type)
             )
 
         if rbc_type == "Dirichlet":
@@ -546,7 +556,8 @@ class SpectralVolume(pybamm.FiniteVolume):
             rbc_vector = pybamm.Vector(np.zeros(n * second_dim_repeats))
         else:
             raise ValueError(
-                "boundary condition must be Dirichlet or Neumann, " f"not '{rbc_type}'"
+                "boundary condition must be Dirichlet or Neumann, "
+                "not '{}'".format(rbc_type)
             )
 
         bcs_vector = lbc_vector + rbc_vector
@@ -623,7 +634,8 @@ class SpectralVolume(pybamm.FiniteVolume):
             lbc_vector = pybamm.Vector(np.zeros(n * second_dim_repeats))
         else:
             raise ValueError(
-                "boundary condition must be Dirichlet or Neumann, " f"not '{lbc_type}'"
+                "boundary condition must be Dirichlet or Neumann, "
+                "not '{}'".format(lbc_type)
             )
 
         if rbc_type == "Neumann":
@@ -638,7 +650,8 @@ class SpectralVolume(pybamm.FiniteVolume):
             rbc_vector = pybamm.Vector(np.zeros(n * second_dim_repeats))
         else:
             raise ValueError(
-                "boundary condition must be Dirichlet or Neumann, " f"not '{rbc_type}'"
+                "boundary condition must be Dirichlet or Neumann, "
+                "not '{}'".format(rbc_type)
             )
 
         bcs_vector = lbc_vector + rbc_vector

@@ -7,16 +7,21 @@ from .base_lithium_ion_model import BaseModel
 
 class SPM(BaseModel):
     """
-    Single Particle Model (SPM) of a lithium-ion battery, from
-    :footcite:t:`Marquis2019`.
+    Single Particle Model (SPM) of a lithium-ion battery, from [1]_.
     See :class:`pybamm.lithium_ion.BaseModel` for more details.
 
     Examples
     --------
+    >>> import pybamm
     >>> model = pybamm.lithium_ion.SPM()
     >>> model.name
     'Single Particle Model'
 
+    References
+    ----------
+    .. [1] SG Marquis, V Sulzer, R Timms, CP Please and SJ Chapman. “An asymptotic
+           derivation of a single particle model with electrolyte”. Journal of The
+           Electrochemical Society, 166(15):A3693–A3706, 2019
     """
 
     def __init__(self, options=None, name="Single Particle Model", build=True):
@@ -47,7 +52,7 @@ class SPM(BaseModel):
             pybamm.citations.register("Marquis2019")
 
         if (
-            self.options["SEI"] not in ["none", "constant", ("constant", "none")]
+            self.options["SEI"] not in ["none", "constant"]
             or self.options["lithium plating"] != "none"
         ):
             pybamm.citations.register("BrosaPlanella2022")
@@ -65,10 +70,10 @@ class SPM(BaseModel):
                 self.submodels[f"{domain} interface"] = inverse_intercalation_kinetics(
                     self.param, domain, "lithium-ion main", self.options
                 )
-                self.submodels[f"{domain} interface current"] = (
-                    pybamm.kinetics.CurrentForInverseButlerVolmer(
-                        self.param, domain, "lithium-ion main", self.options
-                    )
+                self.submodels[
+                    f"{domain} interface current"
+                ] = pybamm.kinetics.CurrentForInverseButlerVolmer(
+                    self.param, domain, "lithium-ion main", self.options
                 )
             else:
                 intercalation_kinetics = self.get_intercalation_kinetics(domain)
@@ -79,10 +84,10 @@ class SPM(BaseModel):
                     )
                     self.submodels[f"{domain} {phase} interface"] = submod
                 if len(phases) > 1:
-                    self.submodels[f"total {domain} interface"] = (
-                        pybamm.kinetics.TotalMainKinetics(
-                            self.param, domain, "lithium-ion main", self.options
-                        )
+                    self.submodels[
+                        f"total {domain} interface"
+                    ] = pybamm.kinetics.TotalMainKinetics(
+                        self.param, domain, "lithium-ion main", self.options
                     )
 
     def set_particle_submodel(self):
@@ -104,40 +109,25 @@ class SPM(BaseModel):
                     submod = pybamm.particle.XAveragedPolynomialProfile(
                         self.param, domain, self.options, phase=phase
                     )
-                elif particle == "MSMR":
-                    submod = pybamm.particle.MSMRDiffusion(
-                        self.param, domain, self.options, phase=phase, x_average=True
-                    )
-                    # also set the submodel for calculating stoichiometry from
-                    # potential
-                    self.submodels[f"{domain} {phase} stoichiometry"] = (
-                        pybamm.particle.MSMRStoichiometryVariables(
-                            self.param,
-                            domain,
-                            self.options,
-                            phase=phase,
-                            x_average=True,
-                        )
-                    )
                 self.submodels[f"{domain} {phase} particle"] = submod
-                self.submodels[f"{domain} {phase} total particle concentration"] = (
-                    pybamm.particle.TotalConcentration(
-                        self.param, domain, self.options, phase
-                    )
+                self.submodels[
+                    f"{domain} {phase} total particle concentration"
+                ] = pybamm.particle.TotalConcentration(
+                    self.param, domain, self.options, phase
                 )
 
     def set_solid_submodel(self):
         for domain in ["negative", "positive"]:
             if self.options.electrode_types[domain] == "planar":
                 continue
-            self.submodels[f"{domain} electrode potential"] = (
-                pybamm.electrode.ohm.LeadingOrder(self.param, domain, self.options)
-            )
+            self.submodels[
+                f"{domain} electrode potential"
+            ] = pybamm.electrode.ohm.LeadingOrder(self.param, domain, self.options)
 
     def set_electrolyte_concentration_submodel(self):
-        self.submodels["electrolyte diffusion"] = (
-            pybamm.electrolyte_diffusion.ConstantConcentration(self.param, self.options)
-        )
+        self.submodels[
+            "electrolyte diffusion"
+        ] = pybamm.electrolyte_diffusion.ConstantConcentration(self.param, self.options)
 
     def set_electrolyte_potential_submodel(self):
         surf_form = pybamm.electrolyte_conductivity.surface_potential_form
@@ -153,10 +143,10 @@ class SPM(BaseModel):
             self.options["surface form"] == "false"
             or self.options.electrode_types["negative"] == "planar"
         ):
-            self.submodels["leading-order electrolyte conductivity"] = (
-                pybamm.electrolyte_conductivity.LeadingOrder(
-                    self.param, options=self.options
-                )
+            self.submodels[
+                "leading-order electrolyte conductivity"
+            ] = pybamm.electrolyte_conductivity.LeadingOrder(
+                self.param, options=self.options
             )
         if self.options["surface form"] == "false":
             surf_model = surf_form.Explicit
@@ -171,6 +161,3 @@ class SPM(BaseModel):
             self.submodels[f"{domain} surface potential difference"] = surf_model(
                 self.param, domain, options=self.options
             )
-
-    def set_summary_variables(self):
-        self.set_default_summary_variables()

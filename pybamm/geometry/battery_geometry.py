@@ -28,7 +28,7 @@ def battery_geometry(
         A geometry class for the battery
 
     """
-    if options is None or type(options) == dict:  # noqa: E721
+    if options is None or type(options) == dict:
         options = pybamm.BatteryModelOptions(options)
     geo = pybamm.GeometricParameters(options)
     L_n = geo.n.L
@@ -135,12 +135,14 @@ def battery_geometry(
             }
         else:
             raise pybamm.GeometryError(
-                f"Invalid current collector dimension '{current_collector_dimension}' (should be 0 or 1 for "
-                "a 'cylindrical' battery geometry)"
+                "Invalid current collector dimension '{}' (should be 0 or 1 for "
+                "a 'cylindrical' battery geometry)".format(current_collector_dimension)
             )
     else:
         raise pybamm.GeometryError(
-            f"Invalid form factor '{form_factor}' (should be 'pouch' or 'cylindrical'"
+            "Invalid form factor '{}' (should be 'pouch' or 'cylindrical'".format(
+                form_factor
+            )
         )
 
     return pybamm.Geometry(geometry)

@@ -1,14 +1,15 @@
+#
+# Method for creating a filled contour plot of pybamm arrays
+#
 import pybamm
 from .quick_plot import ax_min, ax_max
-from pybamm.util import import_optional_dependency
 
 
-def plot2D(x, y, z, ax=None, show_plot=True, **kwargs):
+def plot2D(x, y, z, ax=None, testing=False, **kwargs):
     """
     Generate a simple 2D plot. Calls `matplotlib.pyplot.contourf` with keyword
     arguments 'kwargs'.  For a list of 'kwargs' see the
-    `matplotlib contourf documentation
-    <https://matplotlib.org/stable/api/_as_gen/matplotlib.pyplot.contourf.html>`_
+    `matplotlib contourf documentation <https://tinyurl.com/y8mnadtn>`_
 
     Parameters
     ----------
@@ -20,12 +21,11 @@ def plot2D(x, y, z, ax=None, show_plot=True, **kwargs):
         The array to plot on the z axis. Is of shape (M, N)
     ax : matplotlib Axis, optional
         The axis on which to put the plot. If None, a new figure and axis is created.
-    show_plot : bool, optional
-        Whether to show the plots. Default is True. Set to False if you want to
-        only display the plot after plt.show() has been called.
+    testing : bool, optional
+        Whether to actually make the plot (turned off for unit tests)
 
     """
-    plt = import_optional_dependency("matplotlib.pyplot")
+    import matplotlib.pyplot as plt
 
     if not isinstance(x, pybamm.Array):
         raise TypeError("x must be 'pybamm.Array'")
@@ -35,7 +35,7 @@ def plot2D(x, y, z, ax=None, show_plot=True, **kwargs):
         raise TypeError("z must be 'pybamm.Array'")
 
     if ax is not None:
-        show_plot = False
+        testing = True
     else:
         _, ax = plt.subplots()
 
@@ -53,11 +53,11 @@ def plot2D(x, y, z, ax=None, show_plot=True, **kwargs):
         z.entries,
         vmin=ax_min(z.entries),
         vmax=ax_max(z.entries),
-        **kwargs,
+        **kwargs
     )
     plt.colorbar(plot, ax=ax)
 
-    if show_plot:  # pragma: no cover
+    if not testing:  # pragma: no cover
         plt.show()
 
     return ax

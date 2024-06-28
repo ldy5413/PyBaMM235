@@ -26,16 +26,15 @@ class AlgebraicSolver(pybamm.BaseSolver):
         The tolerance for the solver (default is 1e-6).
     extra_options : dict, optional
         Any options to pass to the rootfinder. Vary depending on which method is chosen.
-        Please consult `SciPy documentation
-        <https://docs.scipy.org/doc/scipy/reference/generated/scipy.optimize.show_options.html>`_
-        for details.
+        Please consult `SciPy documentation <https://tinyurl.com/ybr6cfqs>`_ for
+        details.
     """
 
     def __init__(self, method="lm", tol=1e-6, extra_options=None):
         super().__init__(method=method)
         self.tol = tol
         self.extra_options = extra_options or {}
-        self.name = f"Algebraic solver ({method})"
+        self.name = "Algebraic solver ({})".format(method)
         self.algebraic_solver = True
         pybamm.citations.register("Virtanen2020")
 
@@ -102,12 +101,14 @@ class AlgebraicSolver(pybamm.BaseSolver):
         integration_time = 0
         for idx, t in enumerate(t_eval):
 
-            def root_fun(y_alg, t=t):
+            def root_fun(y_alg):
                 "Evaluates algebraic using y"
                 y = np.concatenate([y0_diff, y_alg])
                 out = algebraic(t, y)
                 pybamm.logger.debug(
-                    f"Evaluating algebraic equations at t={t}, L2-norm is {np.linalg.norm(out)}"
+                    "Evaluating algebraic equations at t={}, L2-norm is {}".format(
+                        t, np.linalg.norm(out)
+                    )
                 )
                 return out
 
@@ -115,7 +116,7 @@ class AlgebraicSolver(pybamm.BaseSolver):
             if jac:
                 if issparse(jac(t_eval[0], y0, inputs)):
 
-                    def jac_fn(y_alg, jac=jac):
+                    def jac_fn(y_alg):
                         """
                         Evaluates Jacobian using y0_diff (fixed) and y_alg (varying)
                         """
@@ -124,7 +125,7 @@ class AlgebraicSolver(pybamm.BaseSolver):
 
                 else:
 
-                    def jac_fn(y_alg, jac=jac):
+                    def jac_fn(y_alg):
                         """
                         Evaluates Jacobian using y0_diff (fixed) and y_alg (varying)
                         """
@@ -169,7 +170,7 @@ class AlgebraicSolver(pybamm.BaseSolver):
                         jac_norm = None
                     else:
 
-                        def jac_norm(y, jac_fn=jac_fn):
+                        def jac_norm(y):
                             return np.sum(2 * root_fun(y) * jac_fn(y), 0)
 
                     if self.method == "minimize":
@@ -214,7 +215,7 @@ class AlgebraicSolver(pybamm.BaseSolver):
                     success = True
                 elif not sol.success:
                     raise pybamm.SolverError(
-                        f"Could not find acceptable solution: {sol.message}"
+                        "Could not find acceptable solution: {}".format(sol.message)
                     )
                 else:
                     y0_alg = sol.x
@@ -222,7 +223,9 @@ class AlgebraicSolver(pybamm.BaseSolver):
                         raise pybamm.SolverError(
                             "Could not find acceptable solution: solver terminated "
                             "successfully, but maximum solution error "
-                            f"({np.max(abs(sol.fun))}) above tolerance ({self.tol})"
+                            "({}) above tolerance ({})".format(
+                                np.max(abs(sol.fun)), self.tol
+                            )
                         )
                 itr += 1
 

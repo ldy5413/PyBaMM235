@@ -1,9 +1,4 @@
-from __future__ import annotations
-
 from enum import Enum
-import numpy as np
-
-from typing import TypeVar
 
 
 class EventType(Enum):
@@ -29,9 +24,6 @@ class EventType(Enum):
     SWITCH = 3
 
 
-E = TypeVar("E", bound="Event")
-
-
 class Event:
     """
 
@@ -54,31 +46,7 @@ class Event:
         self._expression = expression
         self._event_type = event_type
 
-    @classmethod
-    def _from_json(cls: type[E], snippet: dict) -> E:
-        """
-        Reconstructs an Event instance during deserialisation of a JSON file.
-
-        Parameters
-        ----------
-        snippet: dict
-            Contains the information needed to reconstruct a specific instance.
-            Should contain "name", "expression" and "event_type".
-        """
-
-        return cls(
-            snippet["name"],
-            snippet["expression"],
-            event_type=EventType(snippet["event_type"][1]),
-        )
-
-    def evaluate(
-        self,
-        t: float | None = None,
-        y: np.ndarray | None = None,
-        y_dot: np.ndarray | None = None,
-        inputs: dict | None = None,
-    ):
+    def evaluate(self, t=None, y=None, y_dot=None, inputs=None):
         """
         Acts as a drop-in replacement for :func:`pybamm.Symbol.evaluate`
         """
@@ -98,21 +66,3 @@ class Event:
     @property
     def event_type(self):
         return self._event_type
-
-    def to_json(self):
-        """
-        Method to serialise an Event object into JSON.
-
-        The expression is written out seperately,
-        See :meth:`pybamm.Serialise._SymbolEncoder.default()`
-        """
-
-        # event_type contains string name, for JSON readability,
-        # and value for deserialisation.
-
-        json_dict = {
-            "name": self._name,
-            "event_type": [str(self._event_type), self._event_type.value],
-        }
-
-        return json_dict

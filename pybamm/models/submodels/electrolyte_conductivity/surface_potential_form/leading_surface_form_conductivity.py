@@ -3,9 +3,7 @@
 #
 import pybamm
 
-from pybamm.models.submodels.electrolyte_conductivity.leading_order_conductivity import (
-    LeadingOrder,
-)
+from ..leading_order_conductivity import LeadingOrder
 
 
 class BaseLeadingOrderSurfaceForm(LeadingOrder):
@@ -86,26 +84,22 @@ class LeadingOrderDifferential(BaseLeadingOrderSurfaceForm):
 
     def set_rhs(self, variables):
         domain = self.domain
-        T = variables[f"X-averaged {domain} electrode temperature [K]"]
-        C_dl = self.domain_param.C_dl(T)
-
-        delta_phi = variables[
-            f"X-averaged {domain} electrode surface potential difference [V]"
-        ]
-
         sum_a_j = variables[
             f"Sum of x-averaged {domain} electrode volumetric "
             "interfacial current densities [A.m-3]"
         ]
+
         sum_a_j_av = variables[
             f"X-averaged {domain} electrode total volumetric "
             "interfacial current density [A.m-3]"
         ]
-        a = variables[
-            f"X-averaged {domain} electrode surface area to volume ratio [m-1]"
+        delta_phi = variables[
+            f"X-averaged {domain} electrode surface potential difference [V]"
         ]
 
-        self.rhs[delta_phi] = 1 / (a * C_dl) * (sum_a_j_av - sum_a_j)
+        C_dl = self.domain_param.C_dl
+
+        self.rhs[delta_phi] = 1 / C_dl * (sum_a_j_av - sum_a_j)
 
 
 class LeadingOrderAlgebraic(BaseLeadingOrderSurfaceForm):

@@ -76,7 +76,9 @@ class BaseEffectiveResistance(pybamm.BaseModel):
                 options[name] = opt
             else:
                 raise pybamm.OptionError(
-                    f"Option '{name}' not recognised. Best matches are {options.get_best_matches(name)}"
+                    "Option '{}' not recognised. Best matches are {}".format(
+                        name, options.get_best_matches(name)
+                    )
                 )
 
         if options["dimensionality"] not in [1, 2]:
@@ -91,8 +93,7 @@ class BaseEffectiveResistance(pybamm.BaseModel):
 class EffectiveResistance(BaseEffectiveResistance):
     """
     A model which calculates the effective Ohmic resistance of the current
-    collectors in the limit of large electrical conductivity. For details see
-    :footcite:t:`Timms2021`.
+    collectors in the limit of large electrical conductivity. For details see [1]_.
     Note that this formulation assumes uniform *potential* across the tabs. See
     :class:`pybamm.AlternativeEffectiveResistance2D` for the formulation that
     assumes a uniform *current density* at the tabs (in 1D the two formulations
@@ -110,6 +111,11 @@ class EffectiveResistance(BaseEffectiveResistance):
     name : str, optional
         The name of the model.
 
+    References
+    ----------
+    .. [1] R Timms, SG Marquis, V Sulzer, CP Please and SJ Chapman. “Asymptotic
+           Reduction of a Lithium-ion Pouch Cell Model”. SIAM Journal on Applied
+           Mathematics, 81(3), 765--788, 2021
     """
 
     def __init__(

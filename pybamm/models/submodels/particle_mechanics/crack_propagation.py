@@ -74,6 +74,11 @@ class CrackPropagation(BaseMechanics):
         m_cr = self.domain_param.m_cr
         b_cr = self.domain_param.b_cr
         stress_t_surf = variables[f"{Domain} particle surface tangential stress [Pa]"]
+        ## modify here to see the external pressure effects
+        external = self.param.external_pressure
+        stress_t_surf += external # add 10000 to assume external pressure
+        print(f'add {external} to tangential stress')
+        #import pdb; pdb.set_trace()
         l_cr = variables[f"{Domain} particle crack length [m]"]
         # # compressive stress will not lead to crack propagation
         dK_SIF = stress_t_surf * b_cr * pybamm.sqrt(np.pi * l_cr) * (stress_t_surf >= 0)

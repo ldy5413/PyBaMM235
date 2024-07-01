@@ -89,7 +89,9 @@ class LossActiveMaterial(BaseModel):
             beta_LAM = self.domain_param.beta_LAM
             stress_critical = self.domain_param.stress_critical
             m_LAM = self.domain_param.m_LAM
-
+            external = self.param.external_pressure
+            stress_t_surf += external # add external pressuse to surface tangential stresses
+            stress_r_surf += external # add external pressuse to surface radial stresses
             stress_h_surf = (stress_r_surf + 2 * stress_t_surf) / 3
             # compressive stress make no contribution
             stress_h_surf *= stress_h_surf > 0

@@ -141,6 +141,12 @@ class LithiumIonParameters(BaseParameters):
         self.I_typ = self.Q / (self.A_cc * self.n_electrodes_parallel)
         self.a_j_scale = self.I_typ / self.L_x
 
+        # mechanical parameters
+        try:
+            self.external_pressure = pybamm.Parameter("External pressure [Pa]")
+        except:
+            self.external_pressure = pybamm.Scalar(0.)
+            
     def chi(self, c_e, T):
         """
         Thermodynamic factor:
